@@ -87,7 +87,8 @@ class DeezerService {
                 guard let id = item["id"] as? Int64 ?? (item["id"] as? Int).map({ Int64($0) }),
                       let title = item["title"] as? String else { return nil }
                 let tArtist = (item["artist"] as? [String: Any])?["name"] as? String ?? artistName
-                let tArtistId = (item["artist"] as? [String: Any])?["id"] as? Int64 ?? (item["artist"] as? [String: Any])?["id"] as? Int ?? Int(artistId)
+                let tArtistIdRaw = (item["artist"] as? [String: Any])?["id"]
+                let tArtistId = (tArtistIdRaw as? Int64) ?? (tArtistIdRaw as? Int).map { Int64($0) } ?? artistId
                 let dur = item["duration"] as? Int64 ?? (item["duration"] as? Int).map({ Int64($0) }) ?? 0
                 let preview = item["preview"] as? String
                 let isrc = item["isrc"] as? String
@@ -96,7 +97,7 @@ class DeezerService {
                     id: id,
                     title: title,
                     artistName: tArtist,
-                    artistId: Int64(tArtistId),
+                    artistId: tArtistId,
                     albumTitle: albumTitle,
                     albumId: albumId,
                     durationSeconds: dur,

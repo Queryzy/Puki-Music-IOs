@@ -749,6 +749,8 @@ struct LibraryTabView: View {
         .sheet(item: $activePlaylist) { pl in
             PlaylistDetailSheetView(playlist: pl)
                 .environmentObject(playerManager)
+                .presentationDetents([.fraction(0.85), .large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -840,6 +842,49 @@ struct PlaylistDetailSheetView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 
+                // Header Action: Play All & Download Playlist
+                if !playlist.tracks.isEmpty {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            if let first = playlist.tracks.first {
+                                playerManager.play(track: first, fromQueue: playlist.tracks)
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("PUTAR SEMUA")
+                                    .font(.system(size: 13, weight: .bold))
+                            }
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.pukiAmber)
+                            .cornerRadius(10)
+                        }
+                        
+                        Button(action: {
+                            // Toggle batch download
+                            for t in playlist.tracks {
+                                store.downloadedTrackIds.insert(t.id)
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 14))
+                                Text("DOWNLOAD")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color.pukiCardElevated)
+                            .cornerRadius(10)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                
                 if playlist.tracks.isEmpty {
                     Spacer()
                     VStack(spacing: 8) {
@@ -874,6 +919,21 @@ struct PlaylistDetailSheetView: View {
                                                 .foregroundColor(.pukiTextSecondary)
                                         }
                                         Spacer()
+                                        
+                                        // Track Download Status Indicator
+                                        Button(action: {
+                                            if store.downloadedTrackIds.contains(t.id) {
+                                                store.downloadedTrackIds.remove(t.id)
+                                            } else {
+                                                store.downloadedTrackIds.insert(t.id)
+                                            }
+                                        }) {
+                                            Image(systemName: store.downloadedTrackIds.contains(t.id) ? "checkmark.circle.fill" : "arrow.down.circle")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(store.downloadedTrackIds.contains(t.id) ? .pukiAmber : .pukiTextSecondary)
+                                        }
+                                        .padding(.trailing, 6)
+                                        
                                         Image(systemName: "play.fill")
                                             .font(.system(size: 12))
                                             .foregroundColor(.pukiCoral)
@@ -886,7 +946,7 @@ struct PlaylistDetailSheetView: View {
                                 }
                             }
                         }
-                        .padding(.bottom, 60)
+                        .padding(.bottom, 140) // Bottom safe padding agar tidak tertutup mini player
                     }
                 }
             }

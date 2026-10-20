@@ -1331,7 +1331,7 @@ struct LyricsSheetView: View {
     @Environment(\.dismiss) var dismiss
     @State private var lyrics: LyricsResult?
     @State private var isLoading = true
-    @State private var currentLineId: String? = nil
+    @State private var currentLineId: Int64? = nil
     
     var body: some View {
         ZStack {

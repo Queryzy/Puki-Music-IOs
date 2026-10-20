@@ -7,20 +7,16 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Select Xcode 16 / Latest
-        run: |
-          XCODE_PATH=$(xcode-select -p)
-          echo "Default Xcode: $XCODE_PATH"
 
       - name: Create Xcode Project via xcodegen
         run: |
           brew install xcodegen
           xcodegen generate --spec project.yml
+
 
       - name: Build IPA (Ad-Hoc / Unsigned for SideStore & Sideloadly)
         run: |

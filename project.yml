@@ -1,6 +1,7 @@
 name: PukiMusic
 options:
   bundleIdPrefix: com.puki.music
+  xcodeVersion: "15.4"
 targets:
   PukiMusic:
     type: application
@@ -17,3 +18,4 @@ targets:
       SWIFT_VERSION: "5.0"
       INFOPLIST_FILE: PukiMusic/Info.plist
       TARGETED_DEVICE_FAMILY: "1" # iPhone only
+

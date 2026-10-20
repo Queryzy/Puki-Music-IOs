@@ -79,6 +79,14 @@ struct MainContainerView: View {
                 CustomBottomNavBar(selectedTab: $selectedTab)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SearchArtist"))) { notif in
+            if let artistName = notif.object as? String {
+                self.inlineActiveAlbum = nil
+                self.inlineActivePlaylist = nil
+                self.selectedTab = 1 // Switch to Search Tab
+                NotificationCenter.default.post(name: NSNotification.Name("ExecuteSearchQuery"), object: artistName)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenAlbumDetail"))) { notif in
             if let alb = notif.object as? DeezerAlbum {
                 self.inlineActiveAlbum = alb
@@ -134,7 +142,12 @@ struct CustomBottomNavBar: View {
     }
     
     private func navButton(icon: String, label: String, tab: Int) -> some View {
-        Button(action: { selectedTab = tab }) {
+        Button(action: {
+            selectedTab = tab
+            // Reset overlay agar perpindahan tab langsung membuka halaman tab tujuan (1:1 Android)
+            inlineActiveAlbum = nil
+            inlineActivePlaylist = nil
+        }) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: selectedTab == tab ? .bold : .regular))

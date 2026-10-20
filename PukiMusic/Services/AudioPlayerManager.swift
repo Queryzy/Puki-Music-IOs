@@ -35,12 +35,14 @@ class AudioPlayerManager: ObservableObject {
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
+            // Set playback mode with allowBluetoothA2DP for high quality audio without ducking glitches
+            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [.allowBluetoothA2DP])
             try session.setActive(true)
         } catch {
             print("Failed to activate AVAudioSession: \(error)")
         }
         
+        // Handle audio interruptions & restore full volume
         NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
@@ -52,6 +54,8 @@ class AudioPlayerManager: ObservableObject {
                   let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
             
             if type == .ended {
+                try? AVAudioSession.sharedInstance().setActive(true)
+                self.player?.volume = 1.0
                 if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
                     let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                     if options.contains(.shouldResume) {
@@ -63,6 +67,17 @@ class AudioPlayerManager: ObservableObject {
             }
         }
         
+        // Observe route changes (e.g. plugging/unplugging headphones, bluetooth reconnect)
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            try? AVAudioSession.sharedInstance().setActive(true)
+            self.player?.volume = 1.0
+        }
+        
         // Listener transisi background & notification swipe agar audio tidak pernah diputus
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
@@ -70,6 +85,7 @@ class AudioPlayerManager: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             guard let self = self, self.isPlaying else { return }
+            self.player?.volume = 1.0
             self.player?.play()
         }
         
@@ -82,6 +98,7 @@ class AudioPlayerManager: ObservableObject {
             // Mencegah iOS mematikan stream saat control center atau notification center ditarik
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 if self.isPlaying {
+                    self.player?.volume = 1.0
                     self.player?.play()
                 }
             }
@@ -148,8 +165,15 @@ class AudioPlayerManager: ObservableObject {
         player?.pause()
         
         let playerItem = AVPlayerItem(url: url)
+        
+        // 1. Matikan audio spatialization dinamis iOS agar volume tidak pumping/berubah saat bergerak
+        playerItem.allowedAudioSpatializationFormats = .monauralOnly
+        // 2. Kunci algoritma pitch/timestretch murni tanpa kompresi gain dinamis
+        playerItem.audioTimePitchAlgorithm = .spectral
+        
         let newPlayer = AVPlayer(playerItem: playerItem)
         newPlayer.automaticallyWaitsToMinimizeStalling = false
+        newPlayer.volume = 1.0
         
         // KRUSIAL UNTUK iOS: itag 18 YouTube adalah format muxed MP4 (ada video track 360p + audio).
         // Secara default Apple akan mem-pause AVPlayer saat user minimize app / swipe notification center
@@ -158,6 +182,15 @@ class AudioPlayerManager: ObservableObject {
         newPlayer.preventsDisplaySleepDuringVideoPlayback = false
         
         player = newPlayer
+        
+        // Matikan video track pada asset item agar CoreAudio memperlakukan stream sebagai pure audio
+        DispatchQueue.global(qos: .userInitiated).async {
+            for track in playerItem.tracks {
+                if track.assetTrack?.mediaType == .video {
+                    track.isEnabled = false
+                }
+            }
+        }
         
         // Add periodic time observer (every 0.1s for buttery smooth lyrics sync)
         let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -245,6 +278,15 @@ class AudioPlayerManager: ObservableObject {
     }
     
     func playPrevious() {
+        guard let p = player else { return }
+        // 1:1 Android & Spotify: Jika lagu sudah berjalan lebih dari 3 detik, restart ke detik 0
+        if currentTime > 3.0 {
+            seek(to: 0)
+            p.play()
+            return
+        }
+        
+        // Jika masih di awal (< 3 detik), baru pindah ke track sebelumnya
         guard !playlist.isEmpty else { return }
         currentIndex = (currentIndex - 1 + playlist.count) % playlist.count
         let prevTrack = playlist[currentIndex]

@@ -15,6 +15,25 @@ struct Track: Identifiable, Codable, Equatable {
         let seconds = durationSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+    
+    /// Auto-upscale low-res thumbnails to 1000x1000 or maxresdefault for Retina displays (1:1 Android)
+    var highResThumbnailUrl: String {
+        var url = thumbnailUrl
+        if url.contains("deezer.com") {
+            // Replace /250x250- or /500x500- with /1000x1000-
+            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+        } else if url.contains("ytimg.com") || url.contains("ggpht.com") {
+            url = url.replacingOccurrences(of: "hqdefault.jpg", with: "maxresdefault.jpg")
+            url = url.replacingOccurrences(of: "mqdefault.jpg", with: "maxresdefault.jpg")
+            url = url.replacingOccurrences(of: "sddefault.jpg", with: "maxresdefault.jpg")
+            url = url.replacingOccurrences(of: "default.jpg", with: "maxresdefault.jpg")
+            url = url.replacingOccurrences(of: "=w120-h120", with: "=w1000-h1000")
+            url = url.replacingOccurrences(of: "=s120", with: "=s1000")
+        }
+        return url
+    }
 }
 
 struct Album: Identifiable, Codable, Equatable {

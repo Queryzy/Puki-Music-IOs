@@ -47,15 +47,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.8
-          name: "Puki Music iOS v1.0.8"
+          tag_name: v1.0.9
+          name: "Puki Music iOS v1.0.9"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.8 (1:1 Android Parity)
-            - **Background Audio Kernel Fix**: Declared `UIBackgroundModes: [audio, fetch]` directly in `project.yml` XcodeGen properties. Audio plays uninterrupted on screen lock, notification shade pull, and app switching.
-            - **Real Background Download Engine**: Native `URLSessionDownloadDelegate` with background daemon routing. Downloads persist when app is suspended or killed, saving directly to offline folder with manifest tracking.
-            - **Android JSON Import Parity**: Full restoration of `recent_searches` and `play_history` (behavior) from Android backup file.
-            - **Expanded Player Controls 1:1**: Added Repeat Modes Cycle (OFF/ALL/ONE), Shuffle / Mix Play, and 3-mode segmented switcher [Cover | Lirik | Antrean].
-            - **Non-blocking In-line UI**: Replaced modal sheets for Album & Playlist details with in-line navigation stack. Mini player and bottom navigation bar remain visible and accessible.
+            ## Puki Music iOS Native (SwiftUI) v1.0.9 (1:1 Android Parity)
+            - **Volume Stability Fix**: Disabled dynamic range compression and locked `allowedAudioSpatializationFormats = .monauralOnly`, `audioTimePitchAlgorithm = .spectral`, and `player.volume = 1.0`. Eliminates audio pumping/ducking.
+            - **Resilient Offline Downloader**: In-app download engine with iOS background task extension (`UIApplication.beginBackgroundTask`) and dynamic relative manifest resolution.
+            - **3-State Download Indicators**: Clear visual statuses across Home, Search, and Library: Gray (not downloaded), Amber spinner (downloading), and Green solid checkmark with OFFLINE tag (saved to disk).
+            - **Standard Previous Button**: Restarts track to 0:00 if playback duration > 3 seconds, jumps to previous track in queue if under 3 seconds.
+            - **Non-blocking Navigation**: Switching tabs immediately clears detail sheets so users never get locked out of menus.
+            - **Behavior Feed Integration**: Connected imported `play_history` to Home dashboard (Top Favorite Artists carousel & Frequently Played section).
+            - **Proportional HD Player UI**: 1000x1000 high-res cover art upscaler, minimal circular 10pt scrubber thumb, balanced vertical rhythm, and studio quality status badge.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

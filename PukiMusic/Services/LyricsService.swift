@@ -53,10 +53,13 @@ class LyricsService {
             guard let encQ = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                   let url = URL(string: "https://lrclib.net/api/search?q=\(encQ)") else { continue }
             
-            if let best = try? await fetchSearchList(from: url, trackDuration: track.durationSeconds),
-               let validBest = best {
-                cache[track.id] = validBest
-                return validBest
+            do {
+                if let best = try await fetchSearchList(from: url, trackDuration: track.durationSeconds) {
+                    cache[track.id] = best
+                    return best
+                }
+            } catch {
+                continue
             }
         }
         

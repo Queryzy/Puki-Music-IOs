@@ -8,6 +8,8 @@ extension Color {
     static let pukiCoral = Color(hex: "F07575")
     static let pukiMagenta = Color(hex: "E8537D")
     static let pukiRedAccent = Color(hex: "FF2A2A")
+    static let pukiGlowSunset = Color(hex: "FCA766")
+    static let pukiGlowMagenta = Color(hex: "E8537D")
     static let pukiTextPrimary = Color.white
     static let pukiTextSecondary = Color(hex: "9E9EB2")
     

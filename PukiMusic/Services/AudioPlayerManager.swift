@@ -54,6 +54,30 @@ class AudioPlayerManager: ObservableObject {
                 }
             }
         }
+        
+        // Listener transisi background & notification swipe agar audio tidak pernah diputus
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.isPlaying else { return }
+            self.player?.play()
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.isPlaying else { return }
+            // Mencegah iOS mematikan stream saat control center atau notification center ditarik
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                if self.isPlaying {
+                    self.player?.play()
+                }
+            }
+        }
     }
     
     func play(track: Track, fromQueue: [Track] = []) {
@@ -111,6 +135,22 @@ class AudioPlayerManager: ObservableObject {
         let playerItem = AVPlayerItem(url: url)
         let newPlayer = AVPlayer(playerItem: playerItem)
         newPlayer.automaticallyWaitsToMinimizeStalling = false
+        
+        // KRUSIAL UNTUK iOS: itag 18 YouTube adalah format muxed MP4 (ada video track 360p + audio).
+        // Secara default Apple akan mem-pause AVPlayer saat user minimize app / swipe notification center
+        // KECUALI audiovisualBackgroundPlaybackPolicy diatur ke .continuesIfPossible atau disable video track!
+        newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
+        newPlayer.preventsDisplaySleepDuringVideoPlayback = false
+        
+        // Nonaktifkan video track di AVPlayerItem agar iOS memperlakukannya 100% sebagai Pure Background Audio
+        Task {
+            if let tracks = try? await playerItem.asset.loadTracks(withMediaType: .video) {
+                for t in tracks {
+                    playerItem.select(nil, in: nil)
+                }
+            }
+        }
+        
         player = newPlayer
         
         // Add periodic time observer (every 0.1s for buttery smooth lyrics sync)
@@ -187,7 +227,8 @@ class AudioPlayerManager: ObservableObject {
     }
     
     // MARK: - Lockscreen & Control Center Integration
-    private func setupRemoteCommands() {
+    func setupRemoteCommands() {
+        UIApplication.shared.beginReceivingRemoteControlEvents()
         let commandCenter = MPRemoteCommandCenter.shared()
         
         commandCenter.playCommand.isEnabled = true

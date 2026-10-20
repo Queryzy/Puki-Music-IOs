@@ -1040,7 +1040,7 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    Text("1.0.6 (iOS Native)")
+                    Text("1.0.7 (iOS Native)")
                         .foregroundColor(.pukiCoral)
                 }
                 

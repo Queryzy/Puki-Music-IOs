@@ -47,13 +47,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.6
-          name: "Puki Music iOS v1.0.6"
+          tag_name: v1.0.7
+          name: "Puki Music iOS v1.0.7"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.6
-            - **Background Audio Capability**: Added INFOPLIST_KEY_UIBackgroundModes audio in project.yml for xcodegen. Uninterrupted playback when navigating away, pulling notification shade, or locking screen.
-            - **Eliminated Double Playback**: Removed Deezer 30s preview fallback so tracks play directly from full YouTube stream once resolved without stutter.
-            - **Now Playing Player 1:1**: Integrated Favorite Heart button, Add to Playlist Sheet, and in-player lyrics view.
+            ## Puki Music iOS Native (SwiftUI) v1.0.7
+            - **Definitive Background Audio Fix**: Added `audiovisualBackgroundPlaybackPolicy = .continuesIfPossible` and disabled video tracks for YouTube itag 18 stream. Audio now continues uninterrupted when pulling down notification center or switching apps.
+            - **Download Actions 1:1**: Download entire albums, individual tracks, or playlist batches.
+            - **Now Playing UI**: Added Like and Add to Playlist buttons + inline interactive lyrics.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

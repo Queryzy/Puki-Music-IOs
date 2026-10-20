@@ -76,7 +76,10 @@ struct MainContainerView: View {
                 }
                 
                 // Custom Bottom Nav Bar
-                CustomBottomNavBar(selectedTab: $selectedTab)
+                CustomBottomNavBar(selectedTab: $selectedTab, onTabSelected: { _ in
+                    self.inlineActiveAlbum = nil
+                    self.inlineActivePlaylist = nil
+                })
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SearchArtist"))) { notif in
@@ -114,6 +117,7 @@ struct MainContainerView: View {
 // MARK: - Custom Bottom Navigation Bar
 struct CustomBottomNavBar: View {
     @Binding var selectedTab: Int
+    var onTabSelected: ((Int) -> Void)? = nil
     
     var body: some View {
         HStack {
@@ -144,9 +148,7 @@ struct CustomBottomNavBar: View {
     private func navButton(icon: String, label: String, tab: Int) -> some View {
         Button(action: {
             selectedTab = tab
-            // Reset overlay agar perpindahan tab langsung membuka halaman tab tujuan (1:1 Android)
-            inlineActiveAlbum = nil
-            inlineActivePlaylist = nil
+            onTabSelected?(tab)
         }) {
             VStack(spacing: 4) {
                 Image(systemName: icon)

@@ -166,8 +166,8 @@ class AudioPlayerManager: ObservableObject {
         
         let playerItem = AVPlayerItem(url: url)
         
-        // 1. Matikan audio spatialization dinamis iOS agar volume tidak pumping/berubah saat bergerak
-        playerItem.allowedAudioSpatializationFormats = .monauralOnly
+        // 1. Matikan audio spatialization dinamis iOS agar volume tidak pumping/berubah saat bergerak ([] = None / turn off spatialization)
+        playerItem.allowedAudioSpatializationFormats = []
         // 2. Kunci algoritma pitch/timestretch murni tanpa kompresi gain dinamis
         playerItem.audioTimePitchAlgorithm = .spectral
         

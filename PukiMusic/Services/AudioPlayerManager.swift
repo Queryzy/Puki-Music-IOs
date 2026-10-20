@@ -50,12 +50,12 @@ class AudioPlayerManager: ObservableObject {
         self.currentTime = 0
         self.duration = Double(track.durationSeconds)
         
+        // 1. Instant fallback if track already has streamUrl (e.g. Deezer Preview)
         if let streamUrlStr = track.streamUrl, let url = URL(string: streamUrlStr) {
             setupPlayer(url: url, track: track)
-            return
         }
         
-        // Auto resolve audio stream via OmniSource Resolver (Deezer -> YouTube CDN)
+        // 2. Asynchronously resolve full YouTube stream in background
         Task {
             if let resolvedUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
                 title: track.title,
@@ -66,7 +66,8 @@ class AudioPlayerManager: ObservableObject {
                 updatedTrack.streamUrl = resolvedUrlStr
                 self.currentTrack = updatedTrack
                 setupPlayer(url: resolvedUrl, track: updatedTrack)
-            } else {
+            } else if track.streamUrl == nil {
+                // If resolving failed and no fallback stream exists, stop buffering
                 self.isBuffering = false
                 self.isPlaying = false
             }

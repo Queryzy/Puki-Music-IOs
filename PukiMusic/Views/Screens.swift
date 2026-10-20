@@ -74,7 +74,7 @@ struct HomeDashboardView: View {
                     }
                 }
             }
-            .padding(.bottom, 100)
+            .padding(.bottom, 140)
         }
         .task {
             loadDashboard()
@@ -103,7 +103,7 @@ struct HomeDashboardView: View {
                 artist: dTrack.artistName,
                 durationSeconds: dTrack.durationSeconds,
                 thumbnailUrl: dTrack.coverUrl,
-                streamUrl: nil
+                streamUrl: dTrack.previewUrl
             )
             playerManager.play(track: track)
         }) {
@@ -113,20 +113,21 @@ struct HomeDashboardView: View {
                 } placeholder: {
                     Color.pukiCardElevated
                 }
-                .frame(width: 130, height: 130)
-                .cornerRadius(10)
+                .frame(width: 140, height: 140)
+                .cornerRadius(12)
+                .shadow(color: Color.pukiGlowSunset.opacity(0.25), radius: 8, x: 0, y: 4)
                 
                 Text(dTrack.title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .frame(width: 130, alignment: .leading)
+                    .frame(width: 140, alignment: .leading)
                 
                 Text(dTrack.artistName)
                     .font(.system(size: 11))
                     .foregroundColor(.pukiTextSecondary)
                     .lineLimit(1)
-                    .frame(width: 130, alignment: .leading)
+                    .frame(width: 140, alignment: .leading)
             }
         }
     }
@@ -138,20 +139,21 @@ struct HomeDashboardView: View {
             } placeholder: {
                 Color.pukiCardElevated
             }
-            .frame(width: 120, height: 120)
-            .cornerRadius(10)
+            .frame(width: 130, height: 130)
+            .cornerRadius(12)
+            .shadow(color: Color.pukiGlowMagenta.opacity(0.2), radius: 8, x: 0, y: 4)
             
             Text(album.title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .frame(width: 120, alignment: .leading)
+                .frame(width: 130, alignment: .leading)
             
             Text(album.artistName)
                 .font(.system(size: 11))
                 .foregroundColor(.pukiTextSecondary)
                 .lineLimit(1)
-                .frame(width: 120, alignment: .leading)
+                .frame(width: 130, alignment: .leading)
         }
     }
 }
@@ -159,12 +161,16 @@ struct HomeDashboardView: View {
 // MARK: - Search Tab
 struct SearchTabView: View {
     @State private var query = ""
-    @State private var results: [DeezerTrack] = []
+    @State private var trackResults: [DeezerTrack] = []
+    @State private var albumResults: [DeezerAlbum] = []
+    @State private var selectedFilter: Int = 0 // 0: Semua, 1: Lagu, 2: Album
     @State private var isSearching = false
     @EnvironmentObject var playerManager: AudioPlayerManager
     
+    private let filters = ["Semua", "Lagu", "Album"]
+    
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             // Search Input Field
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
@@ -175,7 +181,11 @@ struct SearchTabView: View {
                     .onSubmit { performSearch() }
                 
                 if !query.isEmpty {
-                    Button(action: { query = ""; results = [] }) {
+                    Button(action: {
+                        query = ""
+                        trackResults = []
+                        albumResults = []
+                    }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.pukiTextSecondary)
                     }
@@ -184,67 +194,149 @@ struct SearchTabView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(Color.pukiCardElevated)
-            .cornerRadius(10)
+            .cornerRadius(12)
             .padding(.horizontal, 20)
             .padding(.top, 16)
             
-            if isSearching {
-                ProgressView().tint(.pukiCoral).padding(.top, 40)
-                Spacer()
-            } else {
-                List {
-                    ForEach(results) { dTrack in
-                        Button(action: {
-                            let track = Track(
-                                id: "\(dTrack.id)",
-                                title: dTrack.title,
-                                artist: dTrack.artistName,
-                                durationSeconds: dTrack.durationSeconds,
-                                thumbnailUrl: dTrack.coverUrl,
-                                streamUrl: nil
-                            )
-                            playerManager.play(track: track)
-                        }) {
-                            HStack(spacing: 12) {
-                                AsyncImage(url: URL(string: dTrack.coverUrl)) { img in
-                                    img.resizable().scaledToFill()
-                                } placeholder: {
-                                    Color.pukiCardElevated
-                                }
-                                .frame(width: 48, height: 48)
-                                .cornerRadius(6)
-                                
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(dTrack.title)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .lineLimit(1)
-                                    
-                                    Text("\(dTrack.artistName) • \(dTrack.albumTitle)")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.pukiTextSecondary)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                            }
+            // Filter Chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(0..<filters.count, id: \.self) { idx in
+                        Button(action: { selectedFilter = idx }) {
+                            Text(filters[idx])
+                                .font(.system(size: 13, weight: selectedFilter == idx ? .bold : .medium))
+                                .foregroundColor(selectedFilter == idx ? .white : .pukiTextSecondary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(selectedFilter == idx ? Color.pukiCoral : Color.pukiCard)
+                                .cornerRadius(20)
                         }
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                     }
                 }
-                .listStyle(.plain)
+                .padding(.horizontal, 20)
+            }
+            
+            if isSearching {
+                Spacer()
+                ProgressView().tint(.pukiCoral)
+                Spacer()
+            } else if trackResults.isEmpty && albumResults.isEmpty && !query.isEmpty {
+                Spacer()
+                Text("Tidak ada hasil ditemukan")
+                    .foregroundColor(.pukiTextSecondary)
+                Spacer()
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Section Album Terkait (jika ada dan filter Semua atau Album)
+                        if (selectedFilter == 0 || selectedFilter == 2) && !albumResults.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Album Terkait")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 14) {
+                                        ForEach(albumResults) { album in
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                AsyncImage(url: URL(string: album.coverUrl)) { img in
+                                                    img.resizable().scaledToFill()
+                                                } placeholder: {
+                                                    Color.pukiCardElevated
+                                                }
+                                                .frame(width: 120, height: 120)
+                                                .cornerRadius(10)
+                                                
+                                                Text(album.title)
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .lineLimit(1)
+                                                    .frame(width: 120, alignment: .leading)
+                                                
+                                                Text(album.artistName)
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(.pukiTextSecondary)
+                                                    .lineLimit(1)
+                                                    .frame(width: 120, alignment: .leading)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                }
+                            }
+                        }
+                        
+                        // Section Lagu Terkait (jika filter Semua atau Lagu)
+                        if (selectedFilter == 0 || selectedFilter == 1) && !trackResults.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Lagu")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                
+                                ForEach(trackResults) { dTrack in
+                                    Button(action: {
+                                        let track = Track(
+                                            id: "\(dTrack.id)",
+                                            title: dTrack.title,
+                                            artist: dTrack.artistName,
+                                            durationSeconds: dTrack.durationSeconds,
+                                            thumbnailUrl: dTrack.coverUrl,
+                                            streamUrl: dTrack.previewUrl
+                                        )
+                                        playerManager.play(track: track)
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            AsyncImage(url: URL(string: dTrack.coverUrl)) { img in
+                                                img.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Color.pukiCardElevated
+                                            }
+                                            .frame(width: 50, height: 50)
+                                            .cornerRadius(8)
+                                            
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(dTrack.title)
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .lineLimit(1)
+                                                
+                                                Text("\(dTrack.artistName) • \(dTrack.albumTitle)")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.pukiTextSecondary)
+                                                    .lineLimit(1)
+                                            }
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 4)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.bottom, 120) // Safe padding for mini player
+                }
             }
         }
         .background(Color.pukiBackground)
     }
     
     private func performSearch() {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
         isSearching = true
         Task {
-            let res = (try? await DeezerService.shared.searchTracks(query: query)) ?? []
+            async let tracksReq = DeezerService.shared.searchTracks(query: q)
+            async let albumsReq = DeezerService.shared.searchAlbums(query: q)
+            
+            let tracks = (try? await tracksReq) ?? []
+            let albums = (try? await albumsReq) ?? []
+            
             await MainActor.run {
-                self.results = res
+                self.trackResults = tracks
+                self.albumResults = albums
                 self.isSearching = false
             }
         }
@@ -299,7 +391,7 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    Text("1.0.2 (iOS Native)")
+                    Text("1.0.3 (iOS Native)")
                         .foregroundColor(.pukiCoral)
                 }
                 HStack {
@@ -511,9 +603,18 @@ struct FullScreenPlayerView: View {
                         }
                         
                         Button(action: { playerManager.togglePlayPause() }) {
-                            Image(systemName: playerManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 64))
-                                .foregroundColor(.pukiCoral)
+                            ZStack {
+                                if playerManager.isBuffering {
+                                    ProgressView()
+                                        .tint(.pukiCoral)
+                                        .scaleEffect(1.5)
+                                } else {
+                                    Image(systemName: playerManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                        .font(.system(size: 64))
+                                        .foregroundColor(.pukiCoral)
+                                }
+                            }
+                            .frame(width: 64, height: 64)
                         }
                         
                         Button(action: { playerManager.playNext() }) {

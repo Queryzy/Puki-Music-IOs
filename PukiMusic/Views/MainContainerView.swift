@@ -82,13 +82,17 @@ struct CustomBottomNavBar: View {
             navButton(icon: "gearshape.fill", label: "Pengaturan", tab: 3)
         }
         .padding(.horizontal, 28)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
-        .background(Color.pukiCard.ignoresSafeArea(edges: .bottom))
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+        .background(
+            Color.pukiBackground.opacity(0.85)
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .bottom)
+        )
         .overlay(
             Rectangle()
                 .frame(height: 0.5)
-                .foregroundColor(Color.white.opacity(0.1)),
+                .foregroundColor(Color.white.opacity(0.12)),
             alignment: .top
         )
     }
@@ -170,10 +174,18 @@ struct MiniPlayerView: View {
                 
                 // Play / Pause Button
                 Button(action: { playerManager.togglePlayPause() }) {
-                    Image(systemName: playerManager.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
+                    ZStack {
+                        if playerManager.isBuffering {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: playerManager.isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .frame(width: 36, height: 36)
                 }
             }
             .padding(.horizontal, 16)

@@ -36,6 +36,7 @@ struct DeezerTrack: Identifiable, Codable {
     let durationSeconds: Int64
     let coverUrl: String
     let isrc: String?
+    let previewUrl: String?
 }
 
 struct DeezerAlbum: Identifiable, Codable {

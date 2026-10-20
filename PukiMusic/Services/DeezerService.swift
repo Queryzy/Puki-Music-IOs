@@ -86,6 +86,7 @@ class DeezerService {
         
         let duration = item["duration"] as? Int64 ?? (item["duration"] as? Int).map({ Int64($0) }) ?? 0
         let isrc = item["isrc"] as? String
+        let preview = item["preview"] as? String
         
         return DeezerTrack(
             id: id,
@@ -96,7 +97,8 @@ class DeezerService {
             albumId: albumId,
             durationSeconds: duration,
             coverUrl: cover,
-            isrc: isrc
+            isrc: isrc,
+            previewUrl: preview
         )
     }
     

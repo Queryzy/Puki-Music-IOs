@@ -10,12 +10,14 @@ targets:
     sources: [PukiMusic]
     info:
       path: PukiMusic/Info.plist
+      properties:
+        UILaunchScreen: {}
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.puki.music.ios
-      MARKETING_VERSION: "1.0.0"
-      CURRENT_PROJECT_VERSION: "1"
+      MARKETING_VERSION: "1.0.3"
+      CURRENT_PROJECT_VERSION: "3"
       ENABLE_BITCODE: NO
       SWIFT_VERSION: "5.0"
       INFOPLIST_FILE: PukiMusic/Info.plist
       TARGETED_DEVICE_FAMILY: "1" # iPhone only
-
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

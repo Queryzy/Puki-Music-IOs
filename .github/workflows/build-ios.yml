@@ -1,0 +1,43 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: Create Xcode Project via xcodegen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build IPA (Ad-Hoc / Unsigned for SideStore & Sideloadly)
+        run: |
+          xcodebuild clean archive \
+            -project PukiMusic.xcodeproj \
+            -scheme PukiMusic \
+            -configuration Release \
+            -archivePath build/PukiMusic.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+          mkdir -p build/Payload
+          cp -r build/PukiMusic.xcarchive/Products/Applications/PukiMusic.app build/Payload/
+          cd build && zip -r Puki-Music.ipa Payload
+          echo "IPA Build complete: build/Puki-Music.ipa"
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Puki-Music-iOS-IPA
+          path: build/Puki-Music.ipa

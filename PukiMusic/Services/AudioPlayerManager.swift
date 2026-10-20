@@ -4,6 +4,12 @@ import MediaPlayer
 import Combine
 
 @MainActor
+enum RepeatMode: String, CaseIterable {
+    case off = "OFF"
+    case all = "ALL"
+    case one = "ONE"
+}
+
 class AudioPlayerManager: ObservableObject {
     static let shared = AudioPlayerManager()
     
@@ -14,6 +20,8 @@ class AudioPlayerManager: ObservableObject {
     @Published var playlist: [Track] = []
     @Published var currentIndex: Int = 0
     @Published var isBuffering: Bool = false
+    @Published var repeatMode: RepeatMode = .off
+    @Published var isShuffle: Bool = false
     
     private var player: AVPlayer?
     private var timeObserverToken: Any?
@@ -96,11 +104,18 @@ class AudioPlayerManager: ObservableObject {
         self.currentTime = 0
         self.duration = Double(track.durationSeconds)
         
-        // Hentikan player lama agar tidak memutar potongan preview
+        // Hentikan player lama agar tidak ada tumpang tindih
         self.player?.pause()
         self.isPlaying = false
         
-        // Resolve full YouTube stream langsung (tanpa double playback preview Deezer)
+        // Catat ke behavior play history (1:1 Android)
+        LocalMusicStore.shared.recordPlay(track: track)
+        
+        // 0. Cek apakah lagu sudah ada di file lokal offline (100% instan tanpa kuota)
+        if let localUrl = DownloadService.shared.getLocalAudioFileUrl(for: track.id) {
+            self.setupPlayer(url: localUrl, track: track)
+            return
+        }
         Task {
             if let resolvedUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
                 title: track.title,
@@ -171,7 +186,15 @@ class AudioPlayerManager: ObservableObject {
         
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { [weak self] _ in
-            self?.playNext()
+            guard let self = self else { return }
+            if self.repeatMode == .one {
+                self.seek(to: 0)
+                self.player?.play()
+            } else if self.repeatMode == .all || self.currentIndex + 1 < self.playlist.count {
+                self.playNext()
+            } else {
+                self.isPlaying = false
+            }
         }
     }
     
@@ -194,9 +217,29 @@ class AudioPlayerManager: ObservableObject {
         updateNowPlayingPlaybackInfo()
     }
     
+    func toggleRepeatMode() {
+        switch repeatMode {
+        case .off: repeatMode = .all
+        case .all: repeatMode = .one
+        case .one: repeatMode = .off
+        }
+    }
+    
+    func toggleShuffle() {
+        isShuffle.toggle()
+    }
+    
     func playNext() {
         guard !playlist.isEmpty else { return }
-        currentIndex = (currentIndex + 1) % playlist.count
+        if isShuffle && playlist.count > 1 {
+            var nextIdx = currentIndex
+            while nextIdx == currentIndex {
+                nextIdx = Int.random(in: 0..<playlist.count)
+            }
+            currentIndex = nextIdx
+        } else {
+            currentIndex = (currentIndex + 1) % playlist.count
+        }
         let nextTrack = playlist[currentIndex]
         play(track: nextTrack, fromQueue: playlist)
     }

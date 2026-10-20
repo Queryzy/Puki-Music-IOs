@@ -7,6 +7,16 @@ struct Playlist: Identifiable, Codable {
     var autoDownload: Bool = false
 }
 
+struct PlayHistoryItem: Identifiable, Codable {
+    let id: String
+    let title: String
+    let artist: String
+    let durationSeconds: Int64
+    let thumbnailUrl: String
+    var playCount: Int
+    var lastPlayed: Int64
+}
+
 class LocalMusicStore: ObservableObject {
     static let shared = LocalMusicStore()
     private let userDefaults = UserDefaults.standard
@@ -19,6 +29,7 @@ class LocalMusicStore: ObservableObject {
     @Published var favorites: [Track] = []
     @Published var playlists: [Playlist] = []
     @Published var recentSearches: [String] = []
+    @Published var playHistory: [PlayHistoryItem] = []
     @Published var downloadedTrackIds: Set<String> = []
     @Published var onlyWifiDownload: Bool = true
     
@@ -38,6 +49,10 @@ class LocalMusicStore: ObservableObject {
         if let searches = userDefaults.stringArray(forKey: keyRecentSearches) {
             self.recentSearches = searches
         }
+        if let histData = userDefaults.data(forKey: keyPlayHistory),
+           let hist = try? JSONDecoder().decode([PlayHistoryItem].self, from: histData) {
+            self.playHistory = hist
+        }
         self.onlyWifiDownload = userDefaults.object(forKey: "puki_only_wifi") as? Bool ?? true
     }
     
@@ -51,6 +66,41 @@ class LocalMusicStore: ObservableObject {
         if let data = try? JSONEncoder().encode(playlists) {
             userDefaults.set(data, forKey: keyPlaylists)
         }
+    }
+    
+    func savePlayHistory() {
+        if let data = try? JSONEncoder().encode(playHistory) {
+            userDefaults.set(data, forKey: keyPlayHistory)
+        }
+    }
+    
+    func recordPlay(track: Track) {
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        if let idx = playHistory.firstIndex(where: { $0.id == track.id }) {
+            playHistory[idx].playCount += 1
+            playHistory[idx].lastPlayed = now
+        } else {
+            let newItem = PlayHistoryItem(
+                id: track.id,
+                title: track.title,
+                artist: track.artist,
+                durationSeconds: track.durationSeconds,
+                thumbnailUrl: track.thumbnailUrl,
+                playCount: 1,
+                lastPlayed: now
+            )
+            playHistory.insert(newItem, at: 0)
+        }
+        playHistory.sort {
+            if $0.playCount != $1.playCount {
+                return $0.playCount > $1.playCount
+            }
+            return $0.lastPlayed > $1.lastPlayed
+        }
+        if playHistory.count > 50 {
+            playHistory = Array(playHistory.prefix(50))
+        }
+        savePlayHistory()
     }
     
     func toggleFavorite(track: Track) {
@@ -239,6 +289,59 @@ class LocalMusicStore: ObservableObject {
                 }
             }
             savePlaylists()
+        }
+        
+        // 3. Parse Recent Searches (Riwayat Pencarian Android)
+        if let sArr = json["recent_searches"] as? [String] {
+            var mergedSearches = recentSearches
+            for s in sArr {
+                if !mergedSearches.contains(s) {
+                    mergedSearches.append(s)
+                }
+            }
+            self.recentSearches = mergedSearches
+            userDefaults.set(mergedSearches, forKey: keyRecentSearches)
+        }
+        
+        // 4. Parse Play History (Behavior / Lagu Sering Diputar Android)
+        if let hArr = json["play_history"] as? [[String: Any]] {
+            var currentMap: [String: PlayHistoryItem] = [:]
+            for item in playHistory {
+                currentMap[item.id] = item
+            }
+            for h in hArr {
+                if let id = h["id"] as? String ?? (h["id"] as? Int64).map({ String($0) }),
+                   let title = h["title"] as? String,
+                   let artist = h["artist"] as? String {
+                    let duration = h["duration"] as? Int64 ?? (h["duration"] as? Int).map({ Int64($0) }) ?? 0
+                    let thumb = h["thumbnailUrl"] as? String ?? ""
+                    let count = h["playCount"] as? Int ?? 1
+                    let last = h["lastPlayed"] as? Int64 ?? 0
+                    
+                    if var existing = currentMap[id] {
+                        existing.playCount += count
+                        existing.lastPlayed = max(existing.lastPlayed, last)
+                        currentMap[id] = existing
+                    } else {
+                        currentMap[id] = PlayHistoryItem(
+                            id: id,
+                            title: title,
+                            artist: artist,
+                            durationSeconds: duration,
+                            thumbnailUrl: thumb,
+                            playCount: count,
+                            lastPlayed: last
+                        )
+                    }
+                }
+            }
+            self.playHistory = currentMap.values.sorted {
+                if $0.playCount != $1.playCount {
+                    return $0.playCount > $1.playCount
+                }
+                return $0.lastPlayed > $1.lastPlayed
+            }
+            savePlayHistory()
         }
         
         return (importedPls, importedFavs)

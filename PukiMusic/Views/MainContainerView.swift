@@ -19,26 +19,52 @@ struct MainContainerView: View {
     @State private var showFullScreenPlayer: Bool = false
     @State private var showLyricsSheet: Bool = false
     
+    // In-line Navigation States (1:1 Android: Tidak menimpa mini player dan bottom menu bar)
+    @State private var inlineActiveAlbum: DeezerAlbum? = nil
+    @State private var inlineActivePlaylist: Playlist? = nil
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.pukiBackground.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Tab Content
-                TabView(selection: $selectedTab) {
-                    HomeDashboardView()
-                        .tag(0)
+                // Main Content with In-line Overlay
+                ZStack {
+                    TabView(selection: $selectedTab) {
+                        HomeDashboardView()
+                            .tag(0)
+                        
+                        SearchTabView()
+                            .tag(1)
+                        
+                        LibraryTabView()
+                            .tag(2)
+                        
+                        SettingsTabView()
+                            .tag(3)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                     
-                    SearchTabView()
-                        .tag(1)
+                    // In-line Album View (Di atas tab list, tetap di bawah mini player)
+                    if let album = inlineActiveAlbum {
+                        AlbumDetailSheetView(album: album, onDismiss: {
+                            inlineActiveAlbum = nil
+                        })
+                        .transition(.move(edge: .trailing))
+                        .zIndex(5)
+                    }
                     
-                    LibraryTabView()
-                        .tag(2)
-                    
-                    SettingsTabView()
-                        .tag(3)
+                    // In-line Playlist View (Di atas tab list, tetap di bawah mini player)
+                    if let pl = inlineActivePlaylist {
+                        PlaylistDetailSheetView(playlist: pl, onDismiss: {
+                            inlineActivePlaylist = nil
+                        })
+                        .transition(.move(edge: .trailing))
+                        .zIndex(6)
+                    }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.easeInOut(duration: 0.25), value: inlineActiveAlbum?.id)
+                .animation(.easeInOut(duration: 0.25), value: inlineActivePlaylist?.id)
                 
                 // Mini Player Bar
                 if let track = playerManager.currentTrack {
@@ -51,6 +77,16 @@ struct MainContainerView: View {
                 
                 // Custom Bottom Nav Bar
                 CustomBottomNavBar(selectedTab: $selectedTab)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenAlbumDetail"))) { notif in
+            if let alb = notif.object as? DeezerAlbum {
+                self.inlineActiveAlbum = alb
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenPlaylistDetail"))) { notif in
+            if let pl = notif.object as? Playlist {
+                self.inlineActivePlaylist = pl
             }
         }
         .sheet(isPresented: $showFullScreenPlayer) {

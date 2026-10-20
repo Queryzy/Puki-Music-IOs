@@ -11,14 +11,16 @@ targets:
     info:
       path: PukiMusic/Info.plist
       properties:
+        UIBackgroundModes:
+          - audio
+          - fetch
         UILaunchScreen: {}
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.puki.music.ios
-      MARKETING_VERSION: "1.0.7"
-      CURRENT_PROJECT_VERSION: "7"
+      MARKETING_VERSION: "1.0.8"
+      CURRENT_PROJECT_VERSION: "8"
       ENABLE_BITCODE: NO
       SWIFT_VERSION: "5.0"
       INFOPLIST_FILE: PukiMusic/Info.plist
-      INFOPLIST_KEY_UIBackgroundModes: "audio"
       TARGETED_DEVICE_FAMILY: "1" # iPhone only
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

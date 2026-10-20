@@ -181,7 +181,6 @@ struct SearchTabView: View {
     @State private var albumResults: [DeezerAlbum] = []
     @State private var selectedFilter: Int = 0 // 0: Semua, 1: Lagu, 2: Album
     @State private var isSearching = false
-    @State private var activeAlbum: DeezerAlbum? = nil
     @EnvironmentObject var playerManager: AudioPlayerManager
     @ObservedObject var store = LocalMusicStore.shared
     
@@ -234,7 +233,62 @@ struct SearchTabView: View {
                 .padding(.horizontal, 20)
             }
             
-            if isSearching {
+            if query.isEmpty && trackResults.isEmpty && albumResults.isEmpty {
+                // Riwayat Pencarian Terakhir (1:1 Android)
+                if !store.recentSearches.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("PENCARIAN TERAKHIR")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.pukiTextSecondary)
+                            Spacer()
+                            Button(action: { store.clearRecentSearches() }) {
+                                Text("Hapus Semua")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.pukiCoral)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(store.recentSearches, id: \.self) { searchWord in
+                                    Button(action: {
+                                        query = searchWord
+                                        performSearch()
+                                    }) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "clock.arrow.circlepath")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.pukiAmber)
+                                            Text(searchWord)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.white)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.pukiCardElevated)
+                                        .cornerRadius(14)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+                
+                Spacer()
+                VStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 40))
+                        .foregroundColor(.pukiTextSecondary.opacity(0.5))
+                    Text("Cari lagu favorit lu dari Deezer atau YouTube")
+                        .font(.system(size: 13))
+                        .foregroundColor(.pukiTextSecondary.opacity(0.7))
+                }
+                Spacer()
+            } else if isSearching {
                 Spacer()
                 ProgressView().tint(.pukiCoral)
                 Spacer()
@@ -262,7 +316,7 @@ struct SearchTabView: View {
                                 
                                 ForEach(albumResults) { album in
                                     Button(action: {
-                                        activeAlbum = album
+                                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
                                     }) {
                                         HStack(spacing: 14) {
                                             AsyncImage(url: URL(string: album.coverUrl)) { img in
@@ -357,26 +411,33 @@ struct SearchTabView: View {
                                             }
                                             Spacer()
                                             
-                                            // Quick Action: Add to Playlist & Download
+                                            // Quick Action: Real Background Download (1:1 Android)
+                                            let tid = "\(dTrack.id)"
                                             Button(action: {
                                                 let t = Track(
-                                                    id: "\(dTrack.id)",
+                                                    id: tid,
                                                     title: dTrack.title,
                                                     artist: dTrack.artistName,
                                                     durationSeconds: dTrack.durationSeconds,
                                                     thumbnailUrl: dTrack.coverUrl,
                                                     streamUrl: dTrack.previewUrl
                                                 )
-                                                let tid = "\(dTrack.id)"
-                                                if store.downloadedTrackIds.contains(tid) {
-                                                    store.downloadedTrackIds.remove(tid)
+                                                if DownloadService.shared.isTrackOffline(trackId: tid) {
+                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
                                                 } else {
-                                                    store.downloadedTrackIds.insert(tid)
+                                                    DownloadService.shared.downloadTrack(track: t)
                                                 }
                                             }) {
-                                                Image(systemName: store.downloadedTrackIds.contains("\(dTrack.id)") ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                    .foregroundColor(store.downloadedTrackIds.contains("\(dTrack.id)") ? .pukiAmber : .pukiTextSecondary)
-                                                    .font(.system(size: 16))
+                                                if DownloadService.shared.downloadingTrackIds.contains(tid) {
+                                                    ProgressView()
+                                                        .tint(.pukiAmber)
+                                                        .scaleEffect(0.7)
+                                                        .frame(width: 16, height: 16)
+                                                } else {
+                                                    Image(systemName: DownloadService.shared.isTrackOffline(trackId: tid) ? "checkmark.circle.fill" : "arrow.down.circle")
+                                                        .foregroundColor(DownloadService.shared.isTrackOffline(trackId: tid) ? .pukiAmber : .pukiTextSecondary)
+                                                        .font(.system(size: 16))
+                                                }
                                             }
                                             .padding(.trailing, 4)
                                         }
@@ -392,17 +453,16 @@ struct SearchTabView: View {
             }
         }
         .background(Color.pukiBackground)
-        .sheet(item: $activeAlbum) { album in
-            AlbumDetailSheetView(album: album)
-                .environmentObject(playerManager)
-                .presentationDetents([.fraction(0.85), .large])
-                .presentationDragIndicator(.visible)
-        }
+        // Sheet diganti dengan inline overlay di MainContainerView (1:1 Android)
     }
     
     private func performSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
+        
+        // Simpan ke riwayat pencarian (1:1 Android)
+        store.addRecentSearch(q)
+        
         isSearching = true
         Task {
             async let tracksReq = DeezerService.shared.searchTracks(query: q)
@@ -423,6 +483,7 @@ struct SearchTabView: View {
 // MARK: - Album Detail Modal Sheet
 struct AlbumDetailSheetView: View {
     let album: DeezerAlbum
+    var onDismiss: (() -> Void)? = nil
     @State private var tracks: [DeezerTrack] = []
     @State private var isLoading = true
     @Environment(\.dismiss) var dismiss
@@ -436,8 +497,14 @@ struct AlbumDetailSheetView: View {
             VStack(spacing: 0) {
                 // Header Sheet
                 HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
+                    Button(action: {
+                        if let onDismiss = onDismiss {
+                            onDismiss()
+                        } else {
+                            dismiss()
+                        }
+                    }) {
+                        Image(systemName: "chevron.left.circle.fill")
                             .font(.system(size: 22))
                             .foregroundColor(.pukiTextSecondary)
                     }
@@ -511,7 +578,16 @@ struct AlbumDetailSheetView: View {
                                 
                                 Button(action: {
                                     for t in tracks {
-                                        store.downloadedTrackIds.insert("\(t.id)")
+                                        let tid = "\(t.id)"
+                                        let tr = Track(
+                                            id: tid,
+                                            title: t.title,
+                                            artist: t.artistName,
+                                            durationSeconds: t.durationSeconds,
+                                            thumbnailUrl: album.coverUrl,
+                                            streamUrl: t.previewUrl
+                                        )
+                                        DownloadService.shared.downloadTrack(track: tr)
                                     }
                                 }) {
                                     HStack {
@@ -604,18 +680,33 @@ struct AlbumDetailSheetView: View {
                                                 .font(.system(size: 12))
                                                 .foregroundColor(.pukiTextSecondary)
                                             
-                                            // Individual Track Download Button (1:1 Android)
+                                            // Individual Track Download Button (Real Background Download 1:1 Android)
+                                            let tid = "\(t.id)"
                                             Button(action: {
-                                                let tid = "\(t.id)"
-                                                if store.downloadedTrackIds.contains(tid) {
-                                                    store.downloadedTrackIds.remove(tid)
+                                                let trackObj = Track(
+                                                    id: tid,
+                                                    title: t.title,
+                                                    artist: t.artistName,
+                                                    durationSeconds: t.durationSeconds,
+                                                    thumbnailUrl: album.coverUrl,
+                                                    streamUrl: t.previewUrl
+                                                )
+                                                if DownloadService.shared.isTrackOffline(trackId: tid) {
+                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
                                                 } else {
-                                                    store.downloadedTrackIds.insert(tid)
+                                                    DownloadService.shared.downloadTrack(track: trackObj)
                                                 }
                                             }) {
-                                                Image(systemName: store.downloadedTrackIds.contains("\(t.id)") ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                    .foregroundColor(store.downloadedTrackIds.contains("\(t.id)") ? .pukiAmber : .pukiTextSecondary)
-                                                    .font(.system(size: 15))
+                                                if DownloadService.shared.downloadingTrackIds.contains(tid) {
+                                                    ProgressView()
+                                                        .tint(.pukiAmber)
+                                                        .scaleEffect(0.7)
+                                                        .frame(width: 15, height: 15)
+                                                } else {
+                                                    Image(systemName: DownloadService.shared.isTrackOffline(trackId: tid) ? "checkmark.circle.fill" : "arrow.down.circle")
+                                                        .foregroundColor(DownloadService.shared.isTrackOffline(trackId: tid) ? .pukiAmber : .pukiTextSecondary)
+                                                        .font(.system(size: 15))
+                                                }
                                             }
                                             
                                             Image(systemName: playerManager.currentTrack?.id == "\(t.id)" && playerManager.isPlaying ? "waveform" : "play.fill")
@@ -670,11 +761,11 @@ struct AlbumDetailSheetView: View {
 // MARK: - Library Tab
 struct LibraryTabView: View {
     @ObservedObject var store = LocalMusicStore.shared
+    @ObservedObject var downloadService = DownloadService.shared
     @EnvironmentObject var playerManager: AudioPlayerManager
-    @State private var selectedSubTab: Int = 0 // 0: Playlist, 1: Favorit, 2: Offline
+    @State private var selectedSubTab = 0
     @State private var showingCreatePlaylist = false
     @State private var newPlaylistName = ""
-    @State private var activePlaylist: Playlist? = nil
     
     private let subTabs = ["Playlist", "Favorit", "Offline"]
     
@@ -736,7 +827,9 @@ struct LibraryTabView: View {
                         } else {
                             VStack(spacing: 10) {
                                 ForEach(store.playlists) { pl in
-                                    Button(action: { activePlaylist = pl }) {
+                                    Button(action: {
+                                        NotificationCenter.default.post(name: NSNotification.Name("OpenPlaylistDetail"), object: pl)
+                                    }) {
                                         HStack(spacing: 14) {
                                             ZStack {
                                                 Color.pukiCardElevated
@@ -785,8 +878,8 @@ struct LibraryTabView: View {
                             }
                         }
                     } else {
-                        // Section Offline
-                        let offlineTracks = store.favorites.filter { store.downloadedTrackIds.contains($0.id) }
+                        // Section Offline (Real Downloaded Tracks 1:1 Android)
+                        let offlineTracks = downloadService.downloadedTracks
                         if offlineTracks.isEmpty {
                             emptyState(
                                 icon: "arrow.down.circle",
@@ -814,12 +907,7 @@ struct LibraryTabView: View {
                 newPlaylistName = ""
             }
         }
-        .sheet(item: $activePlaylist) { pl in
-            PlaylistDetailSheetView(playlist: pl)
-                .environmentObject(playerManager)
-                .presentationDetents([.fraction(0.85), .large])
-                .presentationDragIndicator(.visible)
-        }
+        // Sheet diganti dengan inline overlay di MainContainerView (1:1 Android)
     }
     
     private func trackRow(track: Track) -> some View {
@@ -879,6 +967,7 @@ struct LibraryTabView: View {
 // MARK: - Playlist Detail Sheet View
 struct PlaylistDetailSheetView: View {
     let playlist: Playlist
+    var onDismiss: (() -> Void)? = nil
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var playerManager: AudioPlayerManager
     @ObservedObject var store = LocalMusicStore.shared
@@ -888,8 +977,14 @@ struct PlaylistDetailSheetView: View {
             Color.pukiBackground.ignoresSafeArea()
             VStack(spacing: 16) {
                 HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
+                    Button(action: {
+                        if let onDismiss = onDismiss {
+                            onDismiss()
+                        } else {
+                            dismiss()
+                        }
+                    }) {
+                        Image(systemName: "chevron.left.circle.fill")
                             .font(.system(size: 24))
                             .foregroundColor(.pukiTextSecondary)
                     }
@@ -932,9 +1027,9 @@ struct PlaylistDetailSheetView: View {
                         }
                         
                         Button(action: {
-                            // Toggle batch download
+                            // Real Background Download All tracks in Playlist (1:1 Android)
                             for t in playlist.tracks {
-                                store.downloadedTrackIds.insert(t.id)
+                                DownloadService.shared.downloadTrack(track: t)
                             }
                         }) {
                             HStack(spacing: 6) {
@@ -988,17 +1083,24 @@ struct PlaylistDetailSheetView: View {
                                         }
                                         Spacer()
                                         
-                                        // Track Download Status Indicator
+                                        // Track Download Status Indicator (Real Background Download 1:1 Android)
                                         Button(action: {
-                                            if store.downloadedTrackIds.contains(t.id) {
-                                                store.downloadedTrackIds.remove(t.id)
+                                            if DownloadService.shared.isTrackOffline(trackId: t.id) {
+                                                DownloadService.shared.deleteDownloadedTrack(trackId: t.id)
                                             } else {
-                                                store.downloadedTrackIds.insert(t.id)
+                                                DownloadService.shared.downloadTrack(track: t)
                                             }
                                         }) {
-                                            Image(systemName: store.downloadedTrackIds.contains(t.id) ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                .font(.system(size: 16))
-                                                .foregroundColor(store.downloadedTrackIds.contains(t.id) ? .pukiAmber : .pukiTextSecondary)
+                                            if DownloadService.shared.downloadingTrackIds.contains(t.id) {
+                                                ProgressView()
+                                                    .tint(.pukiAmber)
+                                                    .scaleEffect(0.7)
+                                                    .frame(width: 16, height: 16)
+                                            } else {
+                                                Image(systemName: DownloadService.shared.isTrackOffline(trackId: t.id) ? "checkmark.circle.fill" : "arrow.down.circle")
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(DownloadService.shared.isTrackOffline(trackId: t.id) ? .pukiAmber : .pukiTextSecondary)
+                                            }
                                         }
                                         .padding(.trailing, 6)
                                         
@@ -1431,16 +1533,17 @@ struct FullScreenPlayerView: View {
     @EnvironmentObject var playerManager: AudioPlayerManager
     @Environment(\.dismiss) var dismiss
     @ObservedObject var store = LocalMusicStore.shared
+    @ObservedObject var downloadService = DownloadService.shared
     @State private var showingAddToPlaylist = false
-    @State private var showLyricsInline = false
+    @State private var playerCenterMode: Int = 0 // 0: Artwork, 1: Lirik, 2: Antrean (1:1 Android)
     
     var body: some View {
         ZStack {
             Color.pukiBackground.ignoresSafeArea()
             
             if let track = playerManager.currentTrack {
-                VStack(spacing: 20) {
-                    // Header dismiss
+                VStack(spacing: 16) {
+                    // Header dismiss & Segmented Mode Switcher (1:1 Android: Artwork | Lirik | Antrean)
                     HStack {
                         Button(action: { dismiss() }) {
                             Image(systemName: "chevron.down")
@@ -1448,44 +1551,57 @@ struct FullScreenPlayerView: View {
                                 .foregroundColor(.white)
                         }
                         Spacer()
-                        Text("Sedang Memutar")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.pukiTextSecondary)
+                        
+                        // Segmented Mode Switcher
+                        HStack(spacing: 4) {
+                            modeButton(title: "Cover", mode: 0)
+                            modeButton(title: "Lirik", mode: 1)
+                            modeButton(title: "Antrean (\(playerManager.playlist.count))", mode: 2)
+                        }
+                        .padding(3)
+                        .background(Color.pukiCardElevated)
+                        .cornerRadius(16)
+                        
                         Spacer()
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                showLyricsInline.toggle()
-                            }
-                        }) {
-                            Image(systemName: showLyricsInline ? "music.note" : "quote.bubble.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(showLyricsInline ? .pukiAmber : .pukiCoral)
+                        
+                        Button(action: { showingAddToPlaylist = true }) {
+                            Image(systemName: "plus.rectangle.on.rectangle")
+                                .font(.system(size: 18))
+                                .foregroundColor(.pukiTextSecondary)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 20)
                     .padding(.top, 16)
                     
-                    if showLyricsInline {
-                        // In-Player Interactive Realtime Lyrics View
-                        InlineLyricsPlayerView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        Spacer()
-                        
-                        // Big Artwork
-                        AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
-                            img.resizable().scaledToFill()
-                        } placeholder: {
-                            Color.pukiCardElevated
+                    // Center Dynamic Content (Artwork / Lirik / Antrean)
+                    Group {
+                        if playerCenterMode == 0 {
+                            // 0: Artwork
+                            VStack {
+                                Spacer()
+                                AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
+                                    img.resizable().scaledToFill()
+                                } placeholder: {
+                                    Color.pukiCardElevated
+                                }
+                                .frame(width: 290, height: 290)
+                                .cornerRadius(16)
+                                .shadow(color: Color.pukiMagenta.opacity(0.35), radius: 24, x: 0, y: 12)
+                                Spacer()
+                            }
+                        } else if playerCenterMode == 1 {
+                            // 1: Inline Synchronized Lyrics
+                            InlineLyricsPlayerView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // 2: Queue / Antrean Lagu (1:1 Android)
+                            QueueListView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(width: 290, height: 290)
-                        .cornerRadius(16)
-                        .shadow(color: Color.pukiMagenta.opacity(0.35), radius: 24, x: 0, y: 12)
-                        
-                        Spacer()
                     }
+                    .frame(height: 320)
                     
-                    // Title, Artist, & Action Buttons (Favorite + Add to Playlist)
+                    // Title, Artist, & Action Buttons (Download + Heart)
                     HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(track.title)
@@ -1501,25 +1617,30 @@ struct FullScreenPlayerView: View {
                         
                         Spacer()
                         
-                        // Add to Playlist Button
-                        Button(action: { showingAddToPlaylist = true }) {
-                            Image(systemName: "plus.rectangle.on.rectangle")
-                                .font(.system(size: 20))
-                                .foregroundColor(.pukiTextSecondary)
-                        }
-                        .padding(.trailing, 8)
-                        
-                        // Download Song Button (1:1 Android)
+                        // Real Background Download Button (1:1 Android)
                         Button(action: {
-                            if store.downloadedTrackIds.contains(track.id) {
-                                store.downloadedTrackIds.remove(track.id)
+                            if downloadService.isTrackOffline(trackId: track.id) {
+                                downloadService.deleteDownloadedTrack(trackId: track.id)
                             } else {
-                                store.downloadedTrackIds.insert(track.id)
+                                downloadService.downloadTrack(track: track)
                             }
                         }) {
-                            Image(systemName: store.downloadedTrackIds.contains(track.id) ? "checkmark.circle.fill" : "arrow.down.circle")
-                                .font(.system(size: 21))
-                                .foregroundColor(store.downloadedTrackIds.contains(track.id) ? .pukiAmber : .pukiTextSecondary)
+                            ZStack {
+                                if downloadService.downloadingTrackIds.contains(track.id) {
+                                    ProgressView()
+                                        .tint(.pukiAmber)
+                                        .scaleEffect(0.9)
+                                } else if downloadService.isTrackOffline(trackId: track.id) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.pukiAmber)
+                                } else {
+                                    Image(systemName: "arrow.down.circle")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.pukiTextSecondary)
+                                }
+                            }
+                            .frame(width: 36, height: 36)
                         }
                         .padding(.trailing, 8)
                         
@@ -1536,7 +1657,7 @@ struct FullScreenPlayerView: View {
                     }
                     .padding(.horizontal, 28)
                     
-                    // Slider
+                    // Slider Seekbar
                     VStack(spacing: 6) {
                         Slider(
                             value: Binding(
@@ -1559,11 +1680,18 @@ struct FullScreenPlayerView: View {
                     }
                     .padding(.horizontal, 28)
                     
-                    // Controls
-                    HStack(spacing: 44) {
+                    // Main Playback Controls: Shuffle | Prev | Play/Pause | Next | Repeat (1:1 Android)
+                    HStack(spacing: 28) {
+                        // Shuffle Button
+                        Button(action: { playerManager.toggleShuffle() }) {
+                            Image(systemName: "shuffle")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(playerManager.isShuffle ? .pukiCoral : .pukiTextSecondary.opacity(0.5))
+                        }
+                        
                         Button(action: { playerManager.playPrevious() }) {
                             Image(systemName: "backward.fill")
-                                .font(.system(size: 26))
+                                .font(.system(size: 24))
                                 .foregroundColor(.white)
                         }
                         
@@ -1571,24 +1699,46 @@ struct FullScreenPlayerView: View {
                             ZStack {
                                 if playerManager.isBuffering {
                                     ProgressView()
-                                        .tint(.pukiCoral)
-                                        .scaleEffect(1.5)
+                                        .tint(.black)
+                                        .scaleEffect(1.2)
                                 } else {
-                                    Image(systemName: playerManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                        .font(.system(size: 64))
-                                        .foregroundColor(.pukiCoral)
+                                    Image(systemName: playerManager.isPlaying ? "pause.fill" : "play.fill")
+                                        .font(.system(size: 28))
+                                        .foregroundColor(.black)
                                 }
                             }
                             .frame(width: 64, height: 64)
+                            .background(Color.pukiCoral)
+                            .clipShape(Circle())
+                            .shadow(color: Color.pukiCoral.opacity(0.4), radius: 10, x: 0, y: 4)
                         }
                         
                         Button(action: { playerManager.playNext() }) {
                             Image(systemName: "forward.fill")
-                                .font(.system(size: 26))
+                                .font(.system(size: 24))
                                 .foregroundColor(.white)
                         }
+                        
+                        // Repeat Cycle Button (Off -> All -> One)
+                        Button(action: { playerManager.toggleRepeatMode() }) {
+                            Image(systemName: playerManager.repeatMode == .one ? "repeat.1" : "repeat")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(
+                                    playerManager.repeatMode == .off ? .pukiTextSecondary.opacity(0.5) :
+                                    playerManager.repeatMode == .all ? .pukiAmber : .pukiCoral
+                                )
+                        }
                     }
-                    .padding(.bottom, 36)
+                    .padding(.horizontal, 20)
+                    
+                    // Footer Status Badge (1:1 Android)
+                    Text(
+                        playerManager.isShuffle ? "SHUFFLE ACTIVE • REPEAT \(playerManager.repeatMode.rawValue)" :
+                        "REPEAT \(playerManager.repeatMode.rawValue) • 32-BIT HIGH RES AUDIO"
+                    )
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.pukiTextSecondary.opacity(0.7))
+                    .padding(.bottom, 24)
                 }
             }
         }
@@ -1600,10 +1750,102 @@ struct FullScreenPlayerView: View {
         }
     }
     
+    private func modeButton(title: String, mode: Int) -> some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                playerCenterMode = mode
+            }
+        }) {
+            Text(title)
+                .font(.system(size: 11, weight: playerCenterMode == mode ? .bold : .medium))
+                .foregroundColor(playerCenterMode == mode ? .black : .pukiTextSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(playerCenterMode == mode ? Color.pukiAmber : Color.clear)
+                .cornerRadius(12)
+        }
+    }
+    
     private func formatTime(_ sec: Double) -> String {
         let m = Int(sec) / 60
         let s = Int(sec) % 60
         return String(format: "%d:%02d", m, s)
+    }
+}
+
+// MARK: - Queue / Antrean Lagu View (1:1 Android)
+struct QueueListView: View {
+    @EnvironmentObject var playerManager: AudioPlayerManager
+    
+    var body: some View {
+        if playerManager.playlist.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "music.note.list")
+                    .foregroundColor(.pukiTextSecondary)
+                    .font(.system(size: 32))
+                Text("Antrean kosong")
+                    .foregroundColor(.pukiTextSecondary)
+                    .font(.system(size: 13))
+            }
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 6) {
+                        ForEach(Array(playerManager.playlist.enumerated()), id: \.element.id) { idx, t in
+                            let isCur = playerManager.currentIndex == idx
+                            Button(action: {
+                                playerManager.currentIndex = idx
+                                playerManager.play(track: t, fromQueue: playerManager.playlist)
+                            }) {
+                                HStack(spacing: 12) {
+                                    Text(String(format: "%02d", idx + 1))
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(isCur ? .pukiCoral : .pukiTextSecondary)
+                                        .frame(width: 22)
+                                    
+                                    AsyncImage(url: URL(string: t.thumbnailUrl)) { img in
+                                        img.resizable().scaledToFill()
+                                    } placeholder: {
+                                        Color.pukiCardElevated
+                                    }
+                                    .frame(width: 38, height: 38)
+                                    .cornerRadius(6)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(t.title)
+                                            .font(.system(size: 13, weight: isCur ? .bold : .medium))
+                                            .foregroundColor(isCur ? .pukiCoral : .white)
+                                            .lineLimit(1)
+                                        Text(t.artist)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.pukiTextSecondary)
+                                            .lineLimit(1)
+                                    }
+                                    Spacer()
+                                    if isCur {
+                                        Image(systemName: "waveform")
+                                            .foregroundColor(.pukiCoral)
+                                            .font(.system(size: 12))
+                                    }
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(isCur ? Color.pukiCardElevated : Color.pukiCard.opacity(0.5))
+                                .cornerRadius(8)
+                                .padding(.horizontal, 16)
+                                .id(t.id)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 10)
+                }
+                .onAppear {
+                    if let cur = playerManager.currentTrack {
+                        proxy.scrollTo(cur.id, anchor: .center)
+                    }
+                }
+            }
+        }
     }
 }
 

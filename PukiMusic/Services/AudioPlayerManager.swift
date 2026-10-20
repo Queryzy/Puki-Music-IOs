@@ -27,10 +27,32 @@ class AudioPlayerManager: ObservableObject {
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
             try session.setActive(true)
         } catch {
             print("Failed to activate AVAudioSession: \(error)")
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notif in
+            guard let self = self,
+                  let userInfo = notif.userInfo,
+                  let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+            
+            if type == .ended {
+                if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                    let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                    if options.contains(.shouldResume) {
+                        self.player?.play()
+                        self.isPlaying = true
+                        self.updateNowPlayingPlaybackInfo()
+                    }
+                }
+            }
         }
     }
     
@@ -80,7 +102,9 @@ class AudioPlayerManager: ObservableObject {
         player?.pause()
         
         let playerItem = AVPlayerItem(url: url)
-        player = AVPlayer(playerItem: playerItem)
+        let newPlayer = AVPlayer(playerItem: playerItem)
+        newPlayer.automaticallyWaitsToMinimizeStalling = false
+        player = newPlayer
         
         // Add periodic time observer (every 0.25s)
         let interval = CMTime(seconds: 0.25, preferredTimescale: CMTimeScale(NSEC_PER_SEC))

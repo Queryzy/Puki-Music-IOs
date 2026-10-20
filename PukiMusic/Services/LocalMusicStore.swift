@@ -19,6 +19,8 @@ class LocalMusicStore: ObservableObject {
     @Published var favorites: [Track] = []
     @Published var playlists: [Playlist] = []
     @Published var recentSearches: [String] = []
+    @Published var downloadedTrackIds: Set<String> = []
+    @Published var onlyWifiDownload: Bool = true
     
     init() {
         loadData()
@@ -36,6 +38,7 @@ class LocalMusicStore: ObservableObject {
         if let searches = userDefaults.stringArray(forKey: keyRecentSearches) {
             self.recentSearches = searches
         }
+        self.onlyWifiDownload = userDefaults.object(forKey: "puki_only_wifi") as? Bool ?? true
     }
     
     func saveFavorites() {
@@ -57,6 +60,76 @@ class LocalMusicStore: ObservableObject {
             favorites.append(track)
         }
         saveFavorites()
+    }
+    
+    func isFavorite(trackId: String) -> Bool {
+        favorites.contains(where: { $0.id == trackId })
+    }
+    
+    func createPlaylist(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let newPl = Playlist(id: UUID().uuidString, name: trimmed, tracks: [])
+        playlists.append(newPl)
+        savePlaylists()
+    }
+    
+    func deletePlaylist(id: String) {
+        playlists.removeAll(where: { $0.id == id })
+        savePlaylists()
+    }
+    
+    func addTrackToPlaylist(playlistId: String, track: Track) {
+        if let idx = playlists.firstIndex(where: { $0.id == playlistId }) {
+            if !playlists[idx].tracks.contains(where: { $0.id == track.id }) {
+                playlists[idx].tracks.append(track)
+                savePlaylists()
+            }
+        }
+    }
+    
+    func setOnlyWifiDownload(_ val: Bool) {
+        self.onlyWifiDownload = val
+        userDefaults.set(val, forKey: "puki_only_wifi")
+    }
+    
+    // MARK: - Storage Management
+    func getStorageUsageMB() -> Double {
+        let fileManager = FileManager.default
+        var totalBytes: Int64 = 0
+        
+        if let cacheUrl = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            totalBytes += folderSize(at: cacheUrl)
+        }
+        if let docUrl = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            totalBytes += folderSize(at: docUrl)
+        }
+        return Double(totalBytes) / (1024.0 * 1024.0)
+    }
+    
+    private func folderSize(at url: URL) -> Int64 {
+        let fileManager = FileManager.default
+        guard let files = try? fileManager.subpathsOfDirectory(atPath: url.path) else { return 0 }
+        var size: Int64 = 0
+        for file in files {
+            let path = url.appendingPathComponent(file).path
+            if let attrs = try? fileManager.attributesOfItem(atPath: path),
+               let fSize = attrs[.size] as? Int64 {
+                size += fSize
+            }
+        }
+        return size
+    }
+    
+    func clearAllCaches() {
+        let fileManager = FileManager.default
+        if let cacheUrl = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            if let items = try? fileManager.contentsOfDirectory(at: cacheUrl, includingPropertiesForKeys: nil) {
+                for item in items {
+                    try? fileManager.removeItem(at: item)
+                }
+            }
+        }
     }
     
     // MARK: - Export Data (1:1 Android Format Compatible)

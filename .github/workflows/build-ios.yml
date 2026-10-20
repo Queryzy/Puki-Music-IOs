@@ -47,13 +47,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.4
-          name: "Puki Music iOS v1.0.4"
+          tag_name: v1.0.5
+          name: "Puki Music iOS v1.0.5"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.4
-            - **Full Duration Audio Playback**: Direct YouTube InnerTube Android Client (itag 18) engine for 100% full song playback.
-            - **Search Album List**: Changed horizontal album carousel to vertical downward list 1:1 like Android.
-            - **Interactive Album Diskography**: Tap any album to open full tracklist modal sheet and play songs directly.
+            ## Puki Music iOS Native (SwiftUI) v1.0.5
+            - **Background Audio & Lockscreen Controls**: Continuous background playback when app is minimized or notification shade is pulled down. Full MPRemoteCommandCenter and lockscreen media art integration.
+            - **Realtime Lyrics Sync**: Lyrics auto-scroll and highlight matching playback time.
+            - **Playlist, Favorites, & Offline UI**: Create and manage local playlists, save favorites, and manage storage.
+            - **UI Polish**: Album sheet presentation avoids mini-player collision; bottom navigation bar aligned to standard iOS safe margins.
+            - **Branding**: Official Puki Music logo added to Home Header.
+            - **Changelog & Cache Cleaner**: Added in-app release notes dialog and disk space cleaner.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

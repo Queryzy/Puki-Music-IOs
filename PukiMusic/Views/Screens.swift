@@ -8,21 +8,37 @@ struct HomeDashboardView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                // Header Branding
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Puki Music")
-                            .font(.system(size: 26, weight: .bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.pukiAmber, .pukiCoral, .pukiMagenta],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                // Header Branding (1:1 Android with Logo & Gradient)
+                HStack(spacing: 12) {
+                    Image("AppLogo")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 38, height: 38)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(Color.pukiCoral.opacity(0.4), lineWidth: 1.5)
+                        )
+                        .shadow(color: Color.pukiGlowSunset.opacity(0.4), radius: 6, x: 0, y: 2)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("Puki")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("Music")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.pukiAmber, .pukiCoral, .pukiMagenta],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
+                        }
                         
                         Text("Dengarkan lagu tanpa batas iklan")
-                            .font(.system(size: 13))
+                            .font(.system(size: 12))
                             .foregroundColor(.pukiTextSecondary)
                     }
                     Spacer()
@@ -355,6 +371,8 @@ struct SearchTabView: View {
         .sheet(item: $activeAlbum) { album in
             AlbumDetailSheetView(album: album)
                 .environmentObject(playerManager)
+                .presentationDetents([.fraction(0.85), .large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -555,7 +573,7 @@ struct AlbumDetailSheetView: View {
                             }
                         }
                     }
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 140) // Memberikan ruang cukup agar lagu paling bawah tidak tertutup mini player
                 }
             }
         }
@@ -592,45 +610,301 @@ struct AlbumDetailSheetView: View {
 
 // MARK: - Library Tab
 struct LibraryTabView: View {
+    @ObservedObject var store = LocalMusicStore.shared
+    @EnvironmentObject var playerManager: AudioPlayerManager
+    @State private var selectedSubTab: Int = 0 // 0: Playlist, 1: Favorit, 2: Offline
+    @State private var showingCreatePlaylist = false
+    @State private var newPlaylistName = ""
+    @State private var activePlaylist: Playlist? = nil
+    
+    private let subTabs = ["Playlist", "Favorit", "Offline"]
+    
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Koleksi Musik")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-            
-            VStack(spacing: 12) {
-                Image(systemName: "music.note.list")
-                    .font(.system(size: 48))
-                    .foregroundColor(.pukiCoral)
-                
-                Text("Belum Ada Playlist Tersimpan")
-                    .font(.system(size: 16, weight: .semibold))
+        VStack(spacing: 16) {
+            // Header Bar
+            HStack {
+                Text("Koleksi Musik")
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
-                
-                Text("Lagu favorit dan unduhan offline akan muncul di sini.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.pukiTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                Spacer()
+                if selectedSubTab == 0 {
+                    Button(action: { showingCreatePlaylist = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("Playlist")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.pukiAmber)
+                        .cornerRadius(16)
+                    }
+                }
             }
-            .padding(.top, 80)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
             
-            Spacer()
+            // Sub-tabs Selector
+            HStack(spacing: 8) {
+                ForEach(0..<subTabs.count, id: \.self) { idx in
+                    Button(action: { selectedSubTab = idx }) {
+                        Text(subTabs[idx])
+                            .font(.system(size: 13, weight: selectedSubTab == idx ? .bold : .medium))
+                            .foregroundColor(selectedSubTab == idx ? .white : .pukiTextSecondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(selectedSubTab == idx ? Color.pukiCoral : Color.pukiCard)
+                            .cornerRadius(20)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            
+            // Tab Contents
+            ScrollView {
+                VStack(spacing: 16) {
+                    if selectedSubTab == 0 {
+                        // Section Playlists
+                        if store.playlists.isEmpty {
+                            emptyState(
+                                icon: "music.note.list",
+                                title: "Belum Ada Playlist",
+                                subtitle: "Buat playlist pertama lu untuk mengelompokkan lagu favorit."
+                            )
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(store.playlists) { pl in
+                                    Button(action: { activePlaylist = pl }) {
+                                        HStack(spacing: 14) {
+                                            ZStack {
+                                                Color.pukiCardElevated
+                                                Image(systemName: "music.note.list")
+                                                    .foregroundColor(.pukiCoral)
+                                                    .font(.system(size: 22))
+                                            }
+                                            .frame(width: 56, height: 56)
+                                            .cornerRadius(10)
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(pl.name)
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                Text("\(pl.tracks.count) Lagu")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.pukiTextSecondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.pukiTextSecondary)
+                                                .font(.system(size: 13, weight: .semibold))
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                        .background(Color.pukiCard)
+                                        .cornerRadius(12)
+                                        .padding(.horizontal, 20)
+                                    }
+                                }
+                            }
+                        }
+                    } else if selectedSubTab == 1 {
+                        // Section Favorit
+                        if store.favorites.isEmpty {
+                            emptyState(
+                                icon: "heart.slash",
+                                title: "Belum Ada Lagu Favorit",
+                                subtitle: "Ketuk tombol hati di pemutar musik untuk menambahkan lagu favorit."
+                            )
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(store.favorites) { track in
+                                    trackRow(track: track)
+                                }
+                            }
+                        }
+                    } else {
+                        // Section Offline
+                        emptyState(
+                            icon: "arrow.down.circle",
+                            title: "Musik Offline Siap Digunakan",
+                            subtitle: "Unduh lagu untuk mendengarkan tanpa kuota data seluler."
+                        )
+                    }
+                }
+                .padding(.bottom, 140)
+            }
         }
         .background(Color.pukiBackground)
+        .alert("Buat Playlist Baru", isPresented: $showingCreatePlaylist) {
+            TextField("Nama Playlist", text: $newPlaylistName)
+            Button("Batal", role: .cancel) { newPlaylistName = "" }
+            Button("Simpan") {
+                store.createPlaylist(name: newPlaylistName)
+                newPlaylistName = ""
+            }
+        }
+        .sheet(item: $activePlaylist) { pl in
+            PlaylistDetailSheetView(playlist: pl)
+                .environmentObject(playerManager)
+        }
+    }
+    
+    private func trackRow(track: Track) -> some View {
+        Button(action: {
+            playerManager.play(track: track, fromQueue: store.favorites)
+        }) {
+            HStack(spacing: 12) {
+                AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Color.pukiCardElevated
+                }
+                .frame(width: 48, height: 48)
+                .cornerRadius(8)
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(track.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    Text(track.artist)
+                        .font(.system(size: 12))
+                        .foregroundColor(.pukiTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "heart.fill")
+                    .foregroundColor(.pukiCoral)
+                    .font(.system(size: 14))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color.pukiCard)
+            .cornerRadius(10)
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private func emptyState(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 44))
+                .foregroundColor(.pukiCoral.opacity(0.8))
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+            Text(subtitle)
+                .font(.system(size: 13))
+                .foregroundColor(.pukiTextSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .padding(.top, 60)
+    }
+}
+
+// MARK: - Playlist Detail Sheet View
+struct PlaylistDetailSheetView: View {
+    let playlist: Playlist
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var playerManager: AudioPlayerManager
+    @ObservedObject var store = LocalMusicStore.shared
+    
+    var body: some View {
+        ZStack {
+            Color.pukiBackground.ignoresSafeArea()
+            VStack(spacing: 16) {
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
+                    Spacer()
+                    Text(playlist.name.uppercased())
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.pukiAmber)
+                    Spacer()
+                    Button(action: {
+                        store.deletePlaylist(id: playlist.id)
+                        dismiss()
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 16))
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                
+                if playlist.tracks.isEmpty {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 40))
+                            .foregroundColor(.pukiTextSecondary)
+                        Text("Playlist ini masih kosong")
+                            .font(.system(size: 14))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(Array(playlist.tracks.enumerated()), id: \.element.id) { idx, t in
+                                Button(action: {
+                                    playerManager.play(track: t, fromQueue: playlist.tracks)
+                                }) {
+                                    HStack(spacing: 12) {
+                                        Text(String(format: "%02d", idx + 1))
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .foregroundColor(.pukiTextSecondary)
+                                            .frame(width: 20)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(t.title)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(.white)
+                                                .lineLimit(1)
+                                            Text(t.artist)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.pukiTextSecondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.pukiCoral)
+                                    }
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(Color.pukiCard)
+                                    .cornerRadius(10)
+                                    .padding(.horizontal, 20)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 60)
+                    }
+                }
+            }
+        }
     }
 }
 
 // MARK: - Settings Tab
 struct SettingsTabView: View {
+    @ObservedObject var store = LocalMusicStore.shared
     @State private var showingFilePicker = false
     @State private var showingExportSheet = false
+    @State private var showingChangelog = false
+    @State private var showingClearCacheAlert = false
     @State private var exportText: String = ""
     @State private var importMessage: String = ""
     @State private var showingAlert = false
+    @State private var storageMB: Double = 0.0
     
     var body: some View {
         List {
@@ -638,9 +912,23 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    Text("1.0.3 (iOS Native)")
+                    Text("1.0.5 (iOS Native)")
                         .foregroundColor(.pukiCoral)
                 }
+                
+                Button(action: { showingChangelog = true }) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.pukiAmber)
+                        Text("Catatan Rilis (Changelog)")
+                            .foregroundColor(.white)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.pukiTextSecondary)
+                            .font(.system(size: 13))
+                    }
+                }
+                
                 HStack {
                     Text("Build Target")
                     Spacer()
@@ -650,9 +938,47 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Audio Backend")
                     Spacer()
-                    Text("AVPlayer + Deezer / YouTube CDN")
+                    Text("AVPlayer + InnerTube Direct CDN")
                         .foregroundColor(.pukiTextSecondary)
                 }
+            }
+            .listRowBackground(Color.pukiCard)
+            
+            Section(header: Text("PENYIMPANAN & CACHE").foregroundColor(.pukiTextSecondary)) {
+                HStack {
+                    Text("Penggunaan Memori & Cache")
+                    Spacer()
+                    Text(String(format: "%.2f MB", storageMB))
+                        .foregroundColor(.pukiAmber)
+                        .fontWeight(.semibold)
+                }
+                
+                Button(action: { showingClearCacheAlert = true }) {
+                    HStack {
+                        Image(systemName: "trash.fill")
+                            .foregroundColor(.red)
+                        Text("Bersihkan Cache Aplikasi")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .listRowBackground(Color.pukiCard)
+            
+            Section(header: Text("PENGATURAN DOWNLOAD").foregroundColor(.pukiTextSecondary)) {
+                Toggle(isOn: Binding(
+                    get: { store.onlyWifiDownload },
+                    set: { store.setOnlyWifiDownload($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Download Hanya Lewat Wi-Fi")
+                            .foregroundColor(.white)
+                            .font(.system(size: 15))
+                        Text("Hemat kuota data seluler saat mengunduh lagu")
+                            .foregroundColor(.pukiTextSecondary)
+                            .font(.system(size: 12))
+                    }
+                }
+                .tint(.pukiCoral)
             }
             .listRowBackground(Color.pukiCard)
             
@@ -695,25 +1021,24 @@ struct SettingsTabView: View {
                 }
             }
             .listRowBackground(Color.pukiCard)
-            
-            Section(header: Text("STREAMING & KUALITAS").foregroundColor(.pukiTextSecondary)) {
-                HStack {
-                    Text("Kualitas Streaming")
-                    Spacer()
-                    Text("Tinggi (High Quality 320kbps)")
-                        .foregroundColor(.pukiTextSecondary)
-                }
-                HStack {
-                    Text("Lirik Otomatis (LRCLIB)")
-                    Spacer()
-                    Text("Aktif")
-                        .foregroundColor(.pukiCoral)
-                }
-            }
-            .listRowBackground(Color.pukiCard)
         }
         .scrollContentBackground(.hidden)
         .background(Color.pukiBackground)
+        .onAppear {
+            storageMB = store.getStorageUsageMB()
+        }
+        .alert("Bersihkan Cache?", isPresented: $showingClearCacheAlert) {
+            Button("Batal", role: .cancel) {}
+            Button("Hapus", role: .destructive) {
+                store.clearAllCaches()
+                storageMB = store.getStorageUsageMB()
+            }
+        } message: {
+            Text("File cache thumbnail dan buffer audio sementara akan dihapus untuk melegakan penyimpanan.")
+        }
+        .sheet(isPresented: $showingChangelog) {
+            ChangelogSheetView()
+        }
         .fileImporter(
             isPresented: $showingFilePicker,
             allowedContentTypes: [.json, .plainText],
@@ -756,7 +1081,124 @@ struct ShareSheet: UIViewControllerRepresentable {
 }
 
 
-// MARK: - FullScreen Player View
+// MARK: - Changelog Sheet View
+struct ChangelogSheetView: View {
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        ZStack {
+            Color.pukiBackground.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(.pukiAmber)
+                        .font(.system(size: 18))
+                    Text("CATATAN RILIS (CHANGELOG)")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.5 Card
+                        releaseCard(
+                            version: "v1.0.5 (Build 5)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Background Audio & Lockscreen: Lagu tetap berputar saat keluar aplikasi, membuka notifikasi, atau layar terkunci.",
+                                "Sinkronisasi Lirik Realtime: Lirik otomatis berjalan dan terpusat mengikuti ketukan musik.",
+                                "Koleksi Musik Lengkap: Pembuatan playlist baru, kelola favorit, dan unduhan offline.",
+                                "Perbaikan Tata Letak: Sheet album tidak lagi menutupi mini player dan bottom bar disempurnakan setara YouTube Music iOS.",
+                                "Branding Resmi: Logo bulat Puki Music dengan teks gradient terpasang di header utama.",
+                                "Manajemen Penyimpanan & Kuota: Indikator kapasitas cache lokal, tombol bersihkan cache, dan toggle download hanya via Wi-Fi."
+                            ]
+                        )
+                        
+                        // v1.0.4 Card
+                        releaseCard(
+                            version: "v1.0.4",
+                            date: "Oktober 2026",
+                            badge: "AUDIO ENGINE",
+                            changes: [
+                                "YouTube InnerTube Engine: Pemutaran lagu penuh (durasi 3-5 menit tanpa batas 30 detik).",
+                                "Tampilan Album Vertikal: Daftar album pencarian mengalir rapi ke bawah 1:1 identik Android.",
+                                "Diskografi & Sheet Album Interaktif: Ketuk album mana saja untuk memutar seluruh track."
+                            ]
+                        )
+                        
+                        // v1.0.3 Card
+                        releaseCard(
+                            version: "v1.0.3",
+                            date: "Oktober 2026",
+                            badge: "UI POLISH",
+                            changes: [
+                                "Full-screen edge-to-edge layout tanpa letterbox hitam di iPhone 12 Pro Max.",
+                                "Ikon aplikasi resmi 1024x1024 Midnight Glow.",
+                                "Navigasi frosted glass ultra-thin material."
+                            ]
+                        )
+                    }
+                    .padding(20)
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+    }
+    
+    private func releaseCard(version: String, date: String, badge: String, changes: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(version)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                Text(badge)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.pukiAmber)
+                    .cornerRadius(4)
+                Spacer()
+                Text(date)
+                    .font(.system(size: 12))
+                    .foregroundColor(.pukiTextSecondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(changes, id: \.self) { c in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("•")
+                            .foregroundColor(.pukiCoral)
+                            .font(.system(size: 14, weight: .bold))
+                        Text(c)
+                            .foregroundColor(Color(white: 0.88))
+                            .font(.system(size: 13))
+                            .lineSpacing(3)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.pukiCard)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Full Screen Player View
 struct FullScreenPlayerView: View {
     let onLyricsTap: () -> Void
     @EnvironmentObject var playerManager: AudioPlayerManager
@@ -889,6 +1331,7 @@ struct LyricsSheetView: View {
     @Environment(\.dismiss) var dismiss
     @State private var lyrics: LyricsResult?
     @State private var isLoading = true
+    @State private var currentLineId: String? = nil
     
     var body: some View {
         ZStack {
@@ -897,13 +1340,21 @@ struct LyricsSheetView: View {
             VStack(spacing: 16) {
                 // Header
                 HStack {
-                    Text("Lirik Lagu")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Lirik Lagu")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                        if let track = playerManager.currentTrack {
+                            Text("\(track.title) • \(track.artist)")
+                                .font(.system(size: 12))
+                                .foregroundColor(.pukiTextSecondary)
+                                .lineLimit(1)
+                        }
+                    }
                     Spacer()
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22))
+                            .font(.system(size: 24))
                             .foregroundColor(.pukiTextSecondary)
                     }
                 }
@@ -913,23 +1364,29 @@ struct LyricsSheetView: View {
                 if isLoading {
                     Spacer()
                     ProgressView().tint(.pukiCoral)
+                        .scaleEffect(1.3)
                     Spacer()
                 } else if let lrc = lyrics {
                     if lrc.isSynced && !lrc.lines.isEmpty {
                         ScrollViewReader { proxy in
                             ScrollView(showsIndicators: false) {
-                                VStack(spacing: 18) {
+                                VStack(spacing: 22) {
                                     ForEach(lrc.lines) { line in
                                         let isCurrent = isLineActive(line, allLines: lrc.lines)
                                         Text(line.text)
-                                            .font(.system(size: isCurrent ? 22 : 17, weight: isCurrent ? .bold : .medium))
-                                            .foregroundColor(isCurrent ? .pukiAmber : .pukiTextSecondary.opacity(0.6))
+                                            .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
+                                            .foregroundColor(isCurrent ? .pukiAmber : .pukiTextSecondary.opacity(0.45))
                                             .multilineTextAlignment(.center)
+                                            .scaleEffect(isCurrent ? 1.05 : 1.0)
+                                            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isCurrent)
                                             .id(line.id)
                                     }
                                 }
                                 .padding(.horizontal, 24)
-                                .padding(.vertical, 32)
+                                .padding(.vertical, 40)
+                            }
+                            .onChange(of: playerManager.currentTime) { _ in
+                                updateCurrentLine(lines: lrc.lines, proxy: proxy)
                             }
                         }
                     } else if let plain = lrc.plainLyrics {
@@ -945,8 +1402,14 @@ struct LyricsSheetView: View {
                     }
                 } else {
                     Spacer()
-                    Text("Lirik tidak tersedia untuk lagu ini.")
-                        .foregroundColor(.pukiTextSecondary)
+                    VStack(spacing: 12) {
+                        Image(systemName: "quote.bubble")
+                            .font(.system(size: 40))
+                            .foregroundColor(.pukiTextSecondary.opacity(0.5))
+                        Text("Lirik tidak tersedia untuk lagu ini.")
+                            .font(.system(size: 14))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
                     Spacer()
                 }
             }
@@ -955,6 +1418,17 @@ struct LyricsSheetView: View {
             if let track = playerManager.currentTrack {
                 self.lyrics = await LyricsService.shared.getLyrics(track: track)
                 self.isLoading = false
+            }
+        }
+    }
+    
+    private func updateCurrentLine(lines: [LyricLine], proxy: ScrollViewProxy) {
+        let currentMs = Int64(playerManager.currentTime * 1000)
+        guard let active = lines.last(where: { currentMs >= $0.timeMs }) else { return }
+        if currentLineId != active.id {
+            currentLineId = active.id
+            withAnimation(.easeInOut(duration: 0.3)) {
+                proxy.scrollTo(active.id, anchor: .center)
             }
         }
     }

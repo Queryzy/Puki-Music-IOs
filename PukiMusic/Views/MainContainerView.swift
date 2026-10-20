@@ -82,8 +82,8 @@ struct CustomBottomNavBar: View {
             navButton(icon: "gearshape.fill", label: "Pengaturan", tab: 3)
         }
         .padding(.horizontal, 28)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
         .background(
             Color.pukiBackground.opacity(0.85)
                 .background(.ultraThinMaterial)

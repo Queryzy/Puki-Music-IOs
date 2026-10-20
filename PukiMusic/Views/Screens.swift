@@ -287,13 +287,19 @@ struct LibraryTabView: View {
 
 // MARK: - Settings Tab
 struct SettingsTabView: View {
+    @State private var showingFilePicker = false
+    @State private var showingExportSheet = false
+    @State private var exportText: String = ""
+    @State private var importMessage: String = ""
+    @State private var showingAlert = false
+    
     var body: some View {
         List {
             Section(header: Text("TENTANG APLIKASI").foregroundColor(.pukiTextSecondary)) {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    Text("1.0.0 (iOS Native)")
+                    Text("1.0.2 (iOS Native)")
                         .foregroundColor(.pukiCoral)
                 }
                 HStack {
@@ -305,8 +311,48 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Audio Backend")
                     Spacer()
-                    Text("AVPlayer + Deezer FLAC/HQ")
+                    Text("AVPlayer + Deezer / YouTube CDN")
                         .foregroundColor(.pukiTextSecondary)
+                }
+            }
+            .listRowBackground(Color.pukiCard)
+            
+            Section(header: Text("MIGRASI DATA ANTAR-EKOSISTEM").foregroundColor(.pukiTextSecondary)) {
+                Button(action: {
+                    showingFilePicker = true
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down.fill")
+                            .foregroundColor(.pukiAmber)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Impor Cadangan dari Android")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Muat file JSON backup dari Puki Music Android")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
+                }
+                
+                Button(action: {
+                    if let exported = LocalMusicStore.shared.exportBackupJson() {
+                        exportText = exported
+                        showingExportSheet = true
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up.fill")
+                            .foregroundColor(.pukiCoral)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Ekspor Cadangan ke File JSON")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Simpan playlist & favorit untuk dipindah ke Android/PC")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
                 }
             }
             .listRowBackground(Color.pukiCard)
@@ -329,8 +375,47 @@ struct SettingsTabView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.pukiBackground)
+        .fileImporter(
+            isPresented: $showingFilePicker,
+            allowedContentTypes: [.json, .plainText],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    if url.startAccessingSecurityScopedResource() {
+                        defer { url.stopAccessingSecurityScopedResource() }
+                        if let str = try? String(contentsOf: url, encoding: .utf8) {
+                            let res = LocalMusicStore.shared.importBackupJson(str)
+                            importMessage = "Berhasil memuat \(res.favoritesCount) lagu favorit dan \(res.playlistsCount) playlist dari cadangan Android!"
+                            showingAlert = true
+                        }
+                    }
+                }
+            case .failure(let err):
+                importMessage = "Gagal membaca file: \(err.localizedDescription)"
+                showingAlert = true
+            }
+        }
+        .alert("Migrasi Data", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(importMessage)
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            ShareSheet(activityItems: [exportText])
+        }
     }
 }
+
+struct ShareSheet: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 
 // MARK: - FullScreen Player View
 struct FullScreenPlayerView: View {

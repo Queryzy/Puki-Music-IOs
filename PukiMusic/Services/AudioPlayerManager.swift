@@ -50,14 +50,29 @@ class AudioPlayerManager: ObservableObject {
         self.currentTime = 0
         self.duration = Double(track.durationSeconds)
         
-        guard let streamUrlStr = track.streamUrl, let url = URL(string: streamUrlStr) else {
-            // Need stream resolution
-            self.isBuffering = false
+        if let streamUrlStr = track.streamUrl, let url = URL(string: streamUrlStr) {
+            setupPlayer(url: url, track: track)
             return
         }
         
-        setupPlayer(url: url, track: track)
+        // Auto resolve audio stream via OmniSource Resolver (Deezer -> YouTube CDN)
+        Task {
+            if let resolvedUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
+                title: track.title,
+                artist: track.artist,
+                durationSeconds: track.durationSeconds
+            ), let resolvedUrl = URL(string: resolvedUrlStr) {
+                var updatedTrack = track
+                updatedTrack.streamUrl = resolvedUrlStr
+                self.currentTrack = updatedTrack
+                setupPlayer(url: resolvedUrl, track: updatedTrack)
+            } else {
+                self.isBuffering = false
+                self.isPlaying = false
+            }
+        }
     }
+
     
     private func setupPlayer(url: URL, track: Track) {
         removeTimeObserver()

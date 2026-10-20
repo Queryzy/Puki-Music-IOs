@@ -47,17 +47,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.0
-          name: "Puki Music iOS v1.0.0"
+          tag_name: v1.0.1
+          name: "Puki Music iOS v1.0.1"
           body: |
             ## Puki Music iOS Native (SwiftUI)
             - **Target**: iPhone 12 Pro Max / iOS 16+
-            - **Audio**: AVPlayer + Background Playback
-            - **Lockscreen**: MPNowPlayingInfoCenter & MPRemoteCommandCenter
+            - **Audio Engine**: AVPlayer + Background Playback
+            - **Lockscreen**: MPNowPlayingInfoCenter & MPRemoteCommandCenter (artwork, scrubbing, controls)
+            - **Stream Resolver**: OmniSource Resolver (Deezer Chart/Metadata -> YouTube CDN direct audio stream)
             - **UI**: YouTube Music red seekbar line + Puki Midnight Glow theme
-            - **Resolver**: Deezer HD + LRCLIB Synchronized Lyrics
+            - **Lyrics**: LRCLIB Synchronized Lyrics Parser
             
             Download file `Puki-Music.ipa` di bawah untuk di-install via SideStore / Sideloadly / P12.
+
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

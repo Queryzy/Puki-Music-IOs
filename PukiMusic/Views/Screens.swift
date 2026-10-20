@@ -183,6 +183,7 @@ struct SearchTabView: View {
     @State private var isSearching = false
     @State private var activeAlbum: DeezerAlbum? = nil
     @EnvironmentObject var playerManager: AudioPlayerManager
+    @ObservedObject var store = LocalMusicStore.shared
     
     private let filters = ["Semua", "Lagu", "Album"]
     
@@ -355,6 +356,29 @@ struct SearchTabView: View {
                                                     .lineLimit(1)
                                             }
                                             Spacer()
+                                            
+                                            // Quick Action: Add to Playlist & Download
+                                            Button(action: {
+                                                let t = Track(
+                                                    id: "\(dTrack.id)",
+                                                    title: dTrack.title,
+                                                    artist: dTrack.artistName,
+                                                    durationSeconds: dTrack.durationSeconds,
+                                                    thumbnailUrl: dTrack.coverUrl,
+                                                    streamUrl: dTrack.previewUrl
+                                                )
+                                                let tid = "\(dTrack.id)"
+                                                if store.downloadedTrackIds.contains(tid) {
+                                                    store.downloadedTrackIds.remove(tid)
+                                                } else {
+                                                    store.downloadedTrackIds.insert(tid)
+                                                }
+                                            }) {
+                                                Image(systemName: store.downloadedTrackIds.contains("\(dTrack.id)") ? "checkmark.circle.fill" : "arrow.down.circle")
+                                                    .foregroundColor(store.downloadedTrackIds.contains("\(dTrack.id)") ? .pukiAmber : .pukiTextSecondary)
+                                                    .font(.system(size: 16))
+                                            }
+                                            .padding(.trailing, 4)
                                         }
                                         .padding(.horizontal, 20)
                                         .padding(.vertical, 4)
@@ -403,6 +427,7 @@ struct AlbumDetailSheetView: View {
     @State private var isLoading = true
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var playerManager: AudioPlayerManager
+    @ObservedObject var store = LocalMusicStore.shared
     
     var body: some View {
         ZStack {
@@ -465,24 +490,44 @@ struct AlbumDetailSheetView: View {
                         .cornerRadius(14)
                         .padding(.horizontal, 20)
                         
-                        // Action Buttons: Putar Album
+                        // Action Buttons: Putar Album & Unduh 1 Album (1:1 Android)
                         if !tracks.isEmpty {
-                            Button(action: {
-                                playAllAlbumTracks()
-                            }) {
-                                HStack {
-                                    Image(systemName: "shuffle")
-                                        .font(.system(size: 15, weight: .bold))
-                                    Text("PUTAR SEMUA LAGU")
-                                        .font(.system(size: 13, weight: .bold))
+                            HStack(spacing: 12) {
+                                Button(action: {
+                                    playAllAlbumTracks()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "shuffle")
+                                            .font(.system(size: 13, weight: .bold))
+                                        Text("PUTAR ALBUM")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(Color.pukiAmber)
+                                    .cornerRadius(8)
                                 }
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.pukiAmber)
-                                .cornerRadius(10)
-                                .padding(.horizontal, 20)
+                                
+                                Button(action: {
+                                    for t in tracks {
+                                        store.downloadedTrackIds.insert("\(t.id)")
+                                    }
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                            .font(.system(size: 13, weight: .bold))
+                                        Text("UNDUH 1 ALBUM")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(Color.pukiCoral)
+                                    .cornerRadius(8)
+                                }
                             }
+                            .padding(.horizontal, 20)
                         }
                         
                         // Tracks List
@@ -558,6 +603,20 @@ struct AlbumDetailSheetView: View {
                                             Text(formatDuration(t.durationSeconds))
                                                 .font(.system(size: 12))
                                                 .foregroundColor(.pukiTextSecondary)
+                                            
+                                            // Individual Track Download Button (1:1 Android)
+                                            Button(action: {
+                                                let tid = "\(t.id)"
+                                                if store.downloadedTrackIds.contains(tid) {
+                                                    store.downloadedTrackIds.remove(tid)
+                                                } else {
+                                                    store.downloadedTrackIds.insert(tid)
+                                                }
+                                            }) {
+                                                Image(systemName: store.downloadedTrackIds.contains("\(t.id)") ? "checkmark.circle.fill" : "arrow.down.circle")
+                                                    .foregroundColor(store.downloadedTrackIds.contains("\(t.id)") ? .pukiAmber : .pukiTextSecondary)
+                                                    .font(.system(size: 15))
+                                            }
                                             
                                             Image(systemName: playerManager.currentTrack?.id == "\(t.id)" && playerManager.isPlaying ? "waveform" : "play.fill")
                                                 .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .pukiTextSecondary)
@@ -727,11 +786,20 @@ struct LibraryTabView: View {
                         }
                     } else {
                         // Section Offline
-                        emptyState(
-                            icon: "arrow.down.circle",
-                            title: "Musik Offline Siap Digunakan",
-                            subtitle: "Unduh lagu untuk mendengarkan tanpa kuota data seluler."
-                        )
+                        let offlineTracks = store.favorites.filter { store.downloadedTrackIds.contains($0.id) }
+                        if offlineTracks.isEmpty {
+                            emptyState(
+                                icon: "arrow.down.circle",
+                                title: "Belum Ada Musik Offline",
+                                subtitle: "Unduh lagu dari pencarian, album, atau pemutar musik untuk mendengarkan tanpa kuota data seluler."
+                            )
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(offlineTracks) { track in
+                                    trackRow(track: track)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.bottom, 140)
@@ -972,7 +1040,7 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    Text("1.0.5 (iOS Native)")
+                    Text("1.0.6 (iOS Native)")
                         .foregroundColor(.pukiCoral)
                 }
                 
@@ -1439,7 +1507,21 @@ struct FullScreenPlayerView: View {
                                 .font(.system(size: 20))
                                 .foregroundColor(.pukiTextSecondary)
                         }
-                        .padding(.trailing, 12)
+                        .padding(.trailing, 8)
+                        
+                        // Download Song Button (1:1 Android)
+                        Button(action: {
+                            if store.downloadedTrackIds.contains(track.id) {
+                                store.downloadedTrackIds.remove(track.id)
+                            } else {
+                                store.downloadedTrackIds.insert(track.id)
+                            }
+                        }) {
+                            Image(systemName: store.downloadedTrackIds.contains(track.id) ? "checkmark.circle.fill" : "arrow.down.circle")
+                                .font(.system(size: 21))
+                                .foregroundColor(store.downloadedTrackIds.contains(track.id) ? .pukiAmber : .pukiTextSecondary)
+                        }
+                        .padding(.trailing, 8)
                         
                         // Favorite Heart Button
                         Button(action: {

@@ -138,18 +138,9 @@ class AudioPlayerManager: ObservableObject {
         
         // KRUSIAL UNTUK iOS: itag 18 YouTube adalah format muxed MP4 (ada video track 360p + audio).
         // Secara default Apple akan mem-pause AVPlayer saat user minimize app / swipe notification center
-        // KECUALI audiovisualBackgroundPlaybackPolicy diatur ke .continuesIfPossible atau disable video track!
+        // KECUALI audiovisualBackgroundPlaybackPolicy diatur ke .continuesIfPossible!
         newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
         newPlayer.preventsDisplaySleepDuringVideoPlayback = false
-        
-        // Nonaktifkan video track di AVPlayerItem agar iOS memperlakukannya 100% sebagai Pure Background Audio
-        Task {
-            if let tracks = try? await playerItem.asset.loadTracks(withMediaType: .video) {
-                for t in tracks {
-                    playerItem.select(nil, in: nil)
-                }
-            }
-        }
         
         player = newPlayer
         

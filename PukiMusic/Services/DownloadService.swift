@@ -4,6 +4,7 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     static let shared = DownloadService()
     
     @Published var downloadedTrackIds: Set<String> = []
+    @Published var downloadedTracks: [Track] = []
     @Published var downloadingTrackIds: Set<String> = []
     @Published var downloadProgress: [String: Double] = [:]
     
@@ -88,11 +89,11 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     func deleteDownloadedTrack(trackId: String) {
-        if let file = getLocalAudioFileUrl(for: trackId) {
-            try? FileManager.default.removeItem(at: file)
-        }
+        let file = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
+        try? FileManager.default.removeItem(at: file)
         DispatchQueue.main.async {
             self.downloadedTrackIds.remove(trackId)
+            self.downloadedTracks.removeAll(where: { $0.id == trackId })
             self.saveManifest()
         }
     }
@@ -116,6 +117,11 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 self.downloadedTrackIds.insert(tid)
                 self.downloadingTrackIds.remove(tid)
                 self.downloadProgress.removeValue(forKey: tid)
+                if let meta = self.trackMetaPending.removeValue(forKey: tid) {
+                    if !self.downloadedTracks.contains(where: { $0.id == tid }) {
+                        self.downloadedTracks.append(meta)
+                    }
+                }
                 self.saveManifest()
             }
         } catch {
@@ -139,8 +145,7 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     
     private func saveManifest() {
         let manifestFile = getOfflineDirectory().appendingPathComponent(manifestFileName)
-        let array = Array(downloadedTrackIds)
-        if let data = try? JSONSerialization.data(withJSONObject: array, options: .prettyPrinted) {
+        if let data = try? JSONEncoder().encode(downloadedTracks) {
             try? data.write(to: manifestFile)
         }
     }
@@ -148,8 +153,9 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     private func loadDownloadedTrackIds() {
         let manifestFile = getOfflineDirectory().appendingPathComponent(manifestFileName)
         if let data = try? Data(contentsOf: manifestFile),
-           let array = try? JSONSerialization.jsonObject(with: data) as? [String] {
-            self.downloadedTrackIds = Set(array.filter { getLocalAudioFileUrl(for: $0) != nil })
+           let tracks = try? JSONDecoder().decode([Track].self, from: data) {
+            self.downloadedTracks = tracks.filter { getLocalAudioFileUrl(for: $0.id) != nil }
+            self.downloadedTrackIds = Set(self.downloadedTracks.map { $0.id })
         }
     }
 }

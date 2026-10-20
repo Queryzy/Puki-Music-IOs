@@ -74,6 +74,24 @@ class LocalMusicStore: ObservableObject {
         }
     }
     
+    func addRecentSearch(_ term: String) {
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var list = recentSearches
+        list.removeAll(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame })
+        list.insert(trimmed, at: 0)
+        if list.count > 20 {
+            list = Array(list.prefix(20))
+        }
+        self.recentSearches = list
+        userDefaults.set(list, forKey: keyRecentSearches)
+    }
+    
+    func clearRecentSearches() {
+        self.recentSearches = []
+        userDefaults.removeObject(forKey: keyRecentSearches)
+    }
+    
     func recordPlay(track: Track) {
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         if let idx = playHistory.firstIndex(where: { $0.id == track.id }) {

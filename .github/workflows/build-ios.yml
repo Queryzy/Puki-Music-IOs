@@ -47,16 +47,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.3
-          name: "Puki Music iOS v1.0.3"
+          tag_name: v1.0.4
+          name: "Puki Music iOS v1.0.4"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.3
-            - **Target**: iPhone 12 Pro Max / iOS 16+
-            - **Full Screen Edge-to-Edge**: Fixed letterboxing (no more top & bottom black gaps). Full screen layout!
-            - **Official App Icon**: Bundled 1024x1024 high-resolution Puki Music icon with midnight glow badge.
-            - **Audio Engine**: Instant audio playback with zero-second fallback, dynamic buffering indicators, and fixed play/pause toggles.
-            - **Search**: Added album search results and filter tabs (Semua, Lagu, Album).
-            - **Frosted Glass UI**: Ultra-thin material blur navigation bar with ambient glow shadows on cards.
+            ## Puki Music iOS Native (SwiftUI) v1.0.4
+            - **Full Duration Audio Playback**: Direct YouTube InnerTube Android Client (itag 18) engine for 100% full song playback.
+            - **Search Album List**: Changed horizontal album carousel to vertical downward list 1:1 like Android.
+            - **Interactive Album Diskography**: Tap any album to open full tracklist modal sheet and play songs directly.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

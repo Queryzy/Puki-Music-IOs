@@ -68,6 +68,48 @@ class DeezerService {
         return items.compactMap { parseAlbum($0) }
     }
     
+    /// Ambil daftar lagu di dalam satu album tertentu
+    func getAlbumTracks(albumId: Int64) async -> [DeezerTrack] {
+        guard let url = URL(string: "\(baseURL)/album/\(albumId)") else { return [] }
+        do {
+            let (data, _) = try await session.data(from: url)
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+            let albumTitle = json["title"] as? String ?? ""
+            let coverUrl = json["cover_xl"] as? String ?? json["cover_big"] as? String ?? json["cover"] as? String ?? ""
+            let artistObj = json["artist"] as? [String: Any]
+            let artistName = artistObj?["name"] as? String ?? "Various Artists"
+            let artistId = artistObj?["id"] as? Int64 ?? (artistObj?["id"] as? Int).map({ Int64($0) }) ?? 0
+            
+            guard let tracksObj = json["tracks"] as? [String: Any],
+                  let dataArr = tracksObj["data"] as? [[String: Any]] else { return [] }
+            
+            return dataArr.compactMap { item in
+                guard let id = item["id"] as? Int64 ?? (item["id"] as? Int).map({ Int64($0) }),
+                      let title = item["title"] as? String else { return nil }
+                let tArtist = (item["artist"] as? [String: Any])?["name"] as? String ?? artistName
+                let tArtistId = (item["artist"] as? [String: Any])?["id"] as? Int64 ?? (item["artist"] as? [String: Any])?["id"] as? Int ?? Int(artistId)
+                let dur = item["duration"] as? Int64 ?? (item["duration"] as? Int).map({ Int64($0) }) ?? 0
+                let preview = item["preview"] as? String
+                let isrc = item["isrc"] as? String
+                
+                return DeezerTrack(
+                    id: id,
+                    title: title,
+                    artistName: tArtist,
+                    artistId: Int64(tArtistId),
+                    albumTitle: albumTitle,
+                    albumId: albumId,
+                    durationSeconds: dur,
+                    coverUrl: coverUrl,
+                    isrc: isrc,
+                    previewUrl: preview
+                )
+            }
+        } catch {
+            return []
+        }
+    }
+    
     private func parseTrack(_ item: [String: Any]) -> DeezerTrack? {
         guard let id = item["id"] as? Int64 ?? (item["id"] as? Int).map({ Int64($0) }),
               let title = item["title"] as? String else { return nil }

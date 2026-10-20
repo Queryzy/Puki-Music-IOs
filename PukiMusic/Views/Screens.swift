@@ -165,6 +165,7 @@ struct SearchTabView: View {
     @State private var albumResults: [DeezerAlbum] = []
     @State private var selectedFilter: Int = 0 // 0: Semua, 1: Lagu, 2: Album
     @State private var isSearching = false
+    @State private var activeAlbum: DeezerAlbum? = nil
     @EnvironmentObject var playerManager: AudioPlayerManager
     
     private let filters = ["Semua", "Lagu", "Album"]
@@ -228,41 +229,65 @@ struct SearchTabView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        // Section Album Terkait (jika ada dan filter Semua atau Album)
+                        // Section Album Terkait (Tampil List Vertikal ke Bawah persis Android)
                         if (selectedFilter == 0 || selectedFilter == 2) && !albumResults.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Album Terkait")
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 20)
+                                HStack {
+                                    Image(systemName: "opticaldisc.fill")
+                                        .foregroundColor(.pukiCoral)
+                                        .font(.system(size: 14))
+                                    Text("ALBUM RESMI TERKAIT (\(albumResults.count))")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(.pukiCoral)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
                                 
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 14) {
-                                        ForEach(albumResults) { album in
-                                            VStack(alignment: .leading, spacing: 6) {
-                                                AsyncImage(url: URL(string: album.coverUrl)) { img in
-                                                    img.resizable().scaledToFill()
-                                                } placeholder: {
-                                                    Color.pukiCardElevated
-                                                }
-                                                .frame(width: 120, height: 120)
-                                                .cornerRadius(10)
-                                                
+                                ForEach(albumResults) { album in
+                                    Button(action: {
+                                        activeAlbum = album
+                                    }) {
+                                        HStack(spacing: 14) {
+                                            AsyncImage(url: URL(string: album.coverUrl)) { img in
+                                                img.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Color.pukiCardElevated
+                                            }
+                                            .frame(width: 64, height: 64)
+                                            .cornerRadius(10)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                            )
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
                                                 Text(album.title)
-                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .font(.system(size: 15, weight: .bold))
                                                     .foregroundColor(.white)
                                                     .lineLimit(1)
-                                                    .frame(width: 120, alignment: .leading)
                                                 
-                                                Text(album.artistName)
+                                                Text("\(album.artistName)")
+                                                    .font(.system(size: 13))
+                                                    .foregroundColor(.pukiAmber)
+                                                    .lineLimit(1)
+                                                
+                                                Text("\(album.trackCount > 0 ? "\(album.trackCount) Lagu" : "Album Resmi") • Ketuk untuk buka diskografi")
                                                     .font(.system(size: 11))
                                                     .foregroundColor(.pukiTextSecondary)
-                                                    .lineLimit(1)
-                                                    .frame(width: 120, alignment: .leading)
                                             }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.pukiTextSecondary)
+                                                .font(.system(size: 13, weight: .semibold))
                                         }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                        .background(Color.pukiCard)
+                                        .cornerRadius(12)
+                                        .padding(.horizontal, 20)
                                     }
-                                    .padding(.horizontal, 20)
                                 }
                             }
                         }
@@ -270,10 +295,16 @@ struct SearchTabView: View {
                         // Section Lagu Terkait (jika filter Semua atau Lagu)
                         if (selectedFilter == 0 || selectedFilter == 1) && !trackResults.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Lagu")
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 20)
+                                HStack {
+                                    Image(systemName: "music.note")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 14))
+                                    Text("LAGU")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
                                 
                                 ForEach(trackResults) { dTrack in
                                     Button(action: {
@@ -293,7 +324,7 @@ struct SearchTabView: View {
                                             } placeholder: {
                                                 Color.pukiCardElevated
                                             }
-                                            .frame(width: 50, height: 50)
+                                            .frame(width: 52, height: 52)
                                             .cornerRadius(8)
                                             
                                             VStack(alignment: .leading, spacing: 3) {
@@ -321,6 +352,10 @@ struct SearchTabView: View {
             }
         }
         .background(Color.pukiBackground)
+        .sheet(item: $activeAlbum) { album in
+            AlbumDetailSheetView(album: album)
+                .environmentObject(playerManager)
+        }
     }
     
     private func performSearch() {
@@ -340,6 +375,218 @@ struct SearchTabView: View {
                 self.isSearching = false
             }
         }
+    }
+}
+
+// MARK: - Album Detail Modal Sheet
+struct AlbumDetailSheetView: View {
+    let album: DeezerAlbum
+    @State private var tracks: [DeezerTrack] = []
+    @State private var isLoading = true
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var playerManager: AudioPlayerManager
+    
+    var body: some View {
+        ZStack {
+            Color.pukiBackground.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header Sheet
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
+                    Spacer()
+                    Text("DISKOGRAFI & DAFTAR ALBUM")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.pukiCoral)
+                        .tracking(1)
+                    Spacer()
+                    // Dummy spacer to center title
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.clear)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Album Header Info Card
+                        HStack(spacing: 16) {
+                            AsyncImage(url: URL(string: album.coverUrl)) { img in
+                                img.resizable().scaledToFill()
+                            } placeholder: {
+                                Color.pukiCardElevated
+                            }
+                            .frame(width: 84, height: 84)
+                            .cornerRadius(12)
+                            .shadow(color: Color.pukiGlowMagenta.opacity(0.3), radius: 10, x: 0, y: 4)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(album.title)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                
+                                Text(album.artistName)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.pukiAmber)
+                                
+                                Text("\(tracks.count > 0 ? "\(tracks.count) Lagu" : "\(album.trackCount) Lagu") • Album Resmi")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.pukiTextSecondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(14)
+                        .background(Color.pukiCard)
+                        .cornerRadius(14)
+                        .padding(.horizontal, 20)
+                        
+                        // Action Buttons: Putar Album
+                        if !tracks.isEmpty {
+                            Button(action: {
+                                playAllAlbumTracks()
+                            }) {
+                                HStack {
+                                    Image(systemName: "shuffle")
+                                        .font(.system(size: 15, weight: .bold))
+                                    Text("PUTAR SEMUA LAGU")
+                                        .font(.system(size: 13, weight: .bold))
+                                }
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.pukiAmber)
+                                .cornerRadius(10)
+                                .padding(.horizontal, 20)
+                            }
+                        }
+                        
+                        // Tracks List
+                        if isLoading {
+                            VStack {
+                                Spacer()
+                                ProgressView().tint(.pukiCoral)
+                                    .scaleEffect(1.2)
+                                    .padding(.top, 40)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else if tracks.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "music.note.slash")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.pukiTextSecondary)
+                                Text("Daftar lagu album tidak ditemukan")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.pukiTextSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                        } else {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("DAFTAR LAGU (\(tracks.count))")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.pukiTextSecondary)
+                                    .padding(.horizontal, 20)
+                                
+                                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, t in
+                                    Button(action: {
+                                        let selectedTrack = Track(
+                                            id: "\(t.id)",
+                                            title: t.title,
+                                            artist: t.artistName,
+                                            durationSeconds: t.durationSeconds,
+                                            thumbnailUrl: t.coverUrl,
+                                            streamUrl: t.previewUrl
+                                        )
+                                        let allTracks = tracks.map { item in
+                                            Track(
+                                                id: "\(item.id)",
+                                                title: item.title,
+                                                artist: item.artistName,
+                                                durationSeconds: item.durationSeconds,
+                                                thumbnailUrl: item.coverUrl,
+                                                streamUrl: item.previewUrl
+                                            )
+                                        }
+                                        playerManager.play(track: selectedTrack, fromQueue: allTracks)
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            Text(String(format: "%02d", index + 1))
+                                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                                .foregroundColor(.pukiTextSecondary)
+                                                .frame(width: 24, alignment: .leading)
+                                            
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(t.title)
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .white)
+                                                    .lineLimit(1)
+                                                
+                                                Text(t.artistName)
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.pukiTextSecondary)
+                                                    .lineLimit(1)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Text(formatDuration(t.durationSeconds))
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.pukiTextSecondary)
+                                            
+                                            Image(systemName: playerManager.currentTrack?.id == "\(t.id)" && playerManager.isPlaying ? "waveform" : "play.fill")
+                                                .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .pukiTextSecondary)
+                                                .font(.system(size: 12))
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .background(playerManager.currentTrack?.id == "\(t.id)" ? Color.pukiCardElevated : Color.pukiCard.opacity(0.6))
+                                        .cornerRadius(10)
+                                        .padding(.horizontal, 20)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+        .task {
+            let loaded = await DeezerService.shared.getAlbumTracks(albumId: album.id)
+            await MainActor.run {
+                self.tracks = loaded
+                self.isLoading = false
+            }
+        }
+    }
+    
+    private func playAllAlbumTracks() {
+        guard let first = tracks.first else { return }
+        let queue = tracks.map {
+            Track(
+                id: "\($0.id)",
+                title: $0.title,
+                artist: $0.artistName,
+                durationSeconds: $0.durationSeconds,
+                thumbnailUrl: $0.coverUrl,
+                streamUrl: $0.previewUrl
+            )
+        }
+        playerManager.play(track: queue[0], fromQueue: queue)
+    }
+    
+    private func formatDuration(_ seconds: Int64) -> String {
+        let mins = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 }
 

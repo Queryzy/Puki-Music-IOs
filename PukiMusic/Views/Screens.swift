@@ -237,13 +237,13 @@ struct HomeDashboardView: View {
                 title: dTrack.title,
                 artist: dTrack.artistName,
                 durationSeconds: dTrack.durationSeconds,
-                thumbnailUrl: dTrack.coverUrl,
+                thumbnailUrl: dTrack.highResCoverUrl,
                 streamUrl: dTrack.previewUrl
             )
             playerManager.play(track: track)
         }) {
             VStack(alignment: .leading, spacing: 8) {
-                AsyncImage(url: URL(string: dTrack.coverUrl)) { img in
+                AsyncImage(url: URL(string: dTrack.highResCoverUrl)) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {
                     Color.pukiCardElevated
@@ -269,7 +269,7 @@ struct HomeDashboardView: View {
     
     private func albumCard(_ album: DeezerAlbum) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: album.coverUrl)) { img in
+            AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
                 img.resizable().scaledToFill()
             } placeholder: {
                 Color.pukiCardElevated
@@ -438,7 +438,7 @@ struct SearchTabView: View {
                                         NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
                                     }) {
                                         HStack(spacing: 14) {
-                                            AsyncImage(url: URL(string: album.coverUrl)) { img in
+                                            AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {
                                                 Color.pukiCardElevated
@@ -503,13 +503,13 @@ struct SearchTabView: View {
                                             title: dTrack.title,
                                             artist: dTrack.artistName,
                                             durationSeconds: dTrack.durationSeconds,
-                                            thumbnailUrl: dTrack.coverUrl,
+                                            thumbnailUrl: dTrack.highResCoverUrl,
                                             streamUrl: dTrack.previewUrl
                                         )
                                         playerManager.play(track: track)
                                     }) {
                                         HStack(spacing: 12) {
-                                            AsyncImage(url: URL(string: dTrack.coverUrl)) { img in
+                                            AsyncImage(url: URL(string: dTrack.highResCoverUrl)) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {
                                                 Color.pukiCardElevated
@@ -532,32 +532,23 @@ struct SearchTabView: View {
                                             
                                             // Quick Action: Real Background Download (1:1 Android)
                                             let tid = "\(dTrack.id)"
-                                            Button(action: {
-                                                let t = Track(
-                                                    id: tid,
-                                                    title: dTrack.title,
-                                                    artist: dTrack.artistName,
-                                                    durationSeconds: dTrack.durationSeconds,
-                                                    thumbnailUrl: dTrack.coverUrl,
-                                                    streamUrl: dTrack.previewUrl
-                                                )
-                                                if DownloadService.shared.isTrackOffline(trackId: tid) {
-                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
-                                                } else {
+                                            DownloadProgressButton(
+                                                trackId: tid,
+                                                onDownload: {
+                                                    let t = Track(
+                                                        id: tid,
+                                                        title: dTrack.title,
+                                                        artist: dTrack.artistName,
+                                                        durationSeconds: dTrack.durationSeconds,
+                                                        thumbnailUrl: dTrack.highResCoverUrl,
+                                                        streamUrl: dTrack.previewUrl
+                                                    )
                                                     DownloadService.shared.downloadTrack(track: t)
+                                                },
+                                                onDelete: {
+                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
                                                 }
-                                            }) {
-                                                if DownloadService.shared.downloadingTrackIds.contains(tid) {
-                                                    ProgressView()
-                                                        .tint(.pukiAmber)
-                                                        .scaleEffect(0.7)
-                                                        .frame(width: 16, height: 16)
-                                                } else {
-                                                    Image(systemName: DownloadService.shared.isTrackOffline(trackId: tid) ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                        .foregroundColor(DownloadService.shared.isTrackOffline(trackId: tid) ? .green : .pukiTextSecondary.opacity(0.6))
-                                                        .font(.system(size: 16))
-                                                }
-                                            }
+                                            )
                                             .padding(.trailing, 4)
                                         }
                                         .padding(.horizontal, 20)
@@ -651,7 +642,7 @@ struct AlbumDetailSheetView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         // Album Header Info Card
                         HStack(spacing: 16) {
-                            AsyncImage(url: URL(string: album.coverUrl)) { img in
+                            AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
                                 img.resizable().scaledToFill()
                             } placeholder: {
                                 Color.pukiCardElevated
@@ -708,7 +699,7 @@ struct AlbumDetailSheetView: View {
                                             title: t.title,
                                             artist: t.artistName,
                                             durationSeconds: t.durationSeconds,
-                                            thumbnailUrl: album.coverUrl,
+                                            thumbnailUrl: album.highResCoverUrl,
                                             streamUrl: t.previewUrl
                                         )
                                         DownloadService.shared.downloadTrack(track: tr)
@@ -765,7 +756,7 @@ struct AlbumDetailSheetView: View {
                                             title: t.title,
                                             artist: t.artistName,
                                             durationSeconds: t.durationSeconds,
-                                            thumbnailUrl: t.coverUrl,
+                                            thumbnailUrl: t.highResCoverUrl,
                                             streamUrl: t.previewUrl
                                         )
                                         let allTracks = tracks.map { item in
@@ -774,7 +765,7 @@ struct AlbumDetailSheetView: View {
                                                 title: item.title,
                                                 artist: item.artistName,
                                                 durationSeconds: item.durationSeconds,
-                                                thumbnailUrl: item.coverUrl,
+                                                thumbnailUrl: item.highResCoverUrl,
                                                 streamUrl: item.previewUrl
                                             )
                                         }
@@ -806,32 +797,24 @@ struct AlbumDetailSheetView: View {
                                             
                                             // Individual Track Download Button (Real Background Download 1:1 Android)
                                             let tid = "\(t.id)"
-                                            Button(action: {
-                                                let trackObj = Track(
-                                                    id: tid,
-                                                    title: t.title,
-                                                    artist: t.artistName,
-                                                    durationSeconds: t.durationSeconds,
-                                                    thumbnailUrl: album.coverUrl,
-                                                    streamUrl: t.previewUrl
-                                                )
-                                                if DownloadService.shared.isTrackOffline(trackId: tid) {
-                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
-                                                } else {
+                                            DownloadProgressButton(
+                                                trackId: tid,
+                                                onDownload: {
+                                                    let trackObj = Track(
+                                                        id: tid,
+                                                        title: t.title,
+                                                        artist: t.artistName,
+                                                        durationSeconds: t.durationSeconds,
+                                                        thumbnailUrl: album.highResCoverUrl,
+                                                        streamUrl: t.previewUrl
+                                                    )
                                                     DownloadService.shared.downloadTrack(track: trackObj)
+                                                },
+                                                onDelete: {
+                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
                                                 }
-                                            }) {
-                                                if DownloadService.shared.downloadingTrackIds.contains(tid) {
-                                                    ProgressView()
-                                                        .tint(.pukiAmber)
-                                                        .scaleEffect(0.7)
-                                                        .frame(width: 15, height: 15)
-                                                } else {
-                                                    Image(systemName: DownloadService.shared.isTrackOffline(trackId: tid) ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                        .foregroundColor(DownloadService.shared.isTrackOffline(trackId: tid) ? .pukiAmber : .pukiTextSecondary)
-                                                        .font(.system(size: 15))
-                                                }
-                                            }
+                                            )
+                                            .padding(.trailing, 4)
                                             
                                             Image(systemName: playerManager.currentTrack?.id == "\(t.id)" && playerManager.isPlaying ? "waveform" : "play.fill")
                                                 .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .pukiTextSecondary)
@@ -868,7 +851,7 @@ struct AlbumDetailSheetView: View {
                 title: $0.title,
                 artist: $0.artistName,
                 durationSeconds: $0.durationSeconds,
-                thumbnailUrl: $0.coverUrl,
+                thumbnailUrl: $0.highResCoverUrl,
                 streamUrl: $0.previewUrl
             )
         }
@@ -1039,7 +1022,7 @@ struct LibraryTabView: View {
             playerManager.play(track: track, fromQueue: store.favorites)
         }) {
             HStack(spacing: 12) {
-                AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
+                AsyncImage(url: URL(string: track.highResThumbnailUrl)) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {
                     Color.pukiCardElevated
@@ -1073,31 +1056,15 @@ struct LibraryTabView: View {
                 Spacer()
                 
                 // Indikator Download 3-state (1:1 Android)
-                Button(action: {
-                    if downloadService.isTrackOffline(trackId: track.id) {
-                        downloadService.deleteDownloadedTrack(trackId: track.id)
-                    } else {
+                DownloadProgressButton(
+                    trackId: track.id,
+                    onDownload: {
                         downloadService.downloadTrack(track: track)
+                    },
+                    onDelete: {
+                        downloadService.deleteDownloadedTrack(trackId: track.id)
                     }
-                }) {
-                    if downloadService.downloadingTrackIds.contains(track.id) {
-                        ProgressView()
-                            .tint(.pukiAmber)
-                            .scaleEffect(0.7)
-                            .frame(width: 24, height: 24)
-                    } else if downloadService.isTrackOffline(trackId: track.id) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.system(size: 16))
-                            .frame(width: 24, height: 24)
-                    } else {
-                        Image(systemName: "arrow.down.circle")
-                            .foregroundColor(.pukiTextSecondary.opacity(0.6))
-                            .font(.system(size: 16))
-                            .frame(width: 24, height: 24)
-                    }
-                }
-                .buttonStyle(BorderlessButtonStyle())
+                )
                 .padding(.trailing, 4)
                 
                 Image(systemName: "heart.fill")
@@ -1254,24 +1221,15 @@ struct PlaylistDetailSheetView: View {
                                         Spacer()
                                         
                                         // Track Download Status Indicator (Real Background Download 1:1 Android)
-                                        Button(action: {
-                                            if DownloadService.shared.isTrackOffline(trackId: t.id) {
-                                                DownloadService.shared.deleteDownloadedTrack(trackId: t.id)
-                                            } else {
+                                        DownloadProgressButton(
+                                            trackId: t.id,
+                                            onDownload: {
                                                 DownloadService.shared.downloadTrack(track: t)
+                                            },
+                                            onDelete: {
+                                                DownloadService.shared.deleteDownloadedTrack(trackId: t.id)
                                             }
-                                        }) {
-                                            if DownloadService.shared.downloadingTrackIds.contains(t.id) {
-                                                ProgressView()
-                                                    .tint(.pukiAmber)
-                                                    .scaleEffect(0.7)
-                                                    .frame(width: 16, height: 16)
-                                            } else {
-                                                Image(systemName: DownloadService.shared.isTrackOffline(trackId: t.id) ? "checkmark.circle.fill" : "arrow.down.circle")
-                                                    .font(.system(size: 16))
-                                                    .foregroundColor(DownloadService.shared.isTrackOffline(trackId: t.id) ? .pukiAmber : .pukiTextSecondary)
-                                            }
-                                        }
+                                        )
                                         .padding(.trailing, 6)
                                         
                                         Image(systemName: "play.fill")
@@ -1851,30 +1809,15 @@ struct FullScreenPlayerView: View {
                         Spacer()
                         
                         // Download Indicator & Action Button (1:1 Android)
-                        Button(action: {
-                            if downloadService.isTrackOffline(trackId: track.id) {
-                                downloadService.deleteDownloadedTrack(trackId: track.id)
-                            } else {
+                        DownloadProgressButton(
+                            trackId: track.id,
+                            onDownload: {
                                 downloadService.downloadTrack(track: track)
+                            },
+                            onDelete: {
+                                downloadService.deleteDownloadedTrack(trackId: track.id)
                             }
-                        }) {
-                            ZStack {
-                                if downloadService.downloadingTrackIds.contains(track.id) {
-                                    ProgressView()
-                                        .tint(.pukiAmber)
-                                        .scaleEffect(0.9)
-                                } else if downloadService.isTrackOffline(trackId: track.id) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(.green)
-                                } else {
-                                    Image(systemName: "arrow.down.circle")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(.pukiTextSecondary)
-                                }
-                            }
-                            .frame(width: 40, height: 40)
-                        }
+                        )
                         .padding(.trailing, 6)
                         
                         // Favorite Heart Button
@@ -2081,7 +2024,7 @@ struct QueueListView: View {
                                         .foregroundColor(isCur ? .pukiCoral : .pukiTextSecondary)
                                         .frame(width: 22)
                                     
-                                    AsyncImage(url: URL(string: t.thumbnailUrl)) { img in
+                                    AsyncImage(url: URL(string: t.highResThumbnailUrl)) { img in
                                         img.resizable().scaledToFill()
                                     } placeholder: {
                                         Color.pukiCardElevated
@@ -2139,21 +2082,31 @@ struct InlineLyricsPlayerView: View {
             if isLoading {
                 Spacer()
                 ProgressView().tint(.pukiCoral)
+                Text("Memuat lirik sinkron...")
+                    .font(.system(size: 12))
+                    .foregroundColor(.pukiTextSecondary)
+                    .padding(.top, 8)
                 Spacer()
             } else if let lrc = lyrics {
                 if lrc.isSynced && !lrc.lines.isEmpty {
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
-                            VStack(spacing: 24) {
+                            VStack(spacing: 22) {
                                 ForEach(lrc.lines) { line in
                                     let isCurrent = isLineActive(line, allLines: lrc.lines)
-                                    Text(line.text)
-                                        .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
-                                        .foregroundColor(isCurrent ? .pukiAmber : .white.opacity(0.35))
-                                        .multilineTextAlignment(.center)
-                                        .scaleEffect(isCurrent ? 1.05 : 1.0)
-                                        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isCurrent)
-                                        .id(line.id)
+                                    Button(action: {
+                                        // Tap pada baris lirik untuk seek ke detik lagu (1:1 Android)
+                                        playerManager.seek(to: Double(line.timeMs) / 1000.0)
+                                    }) {
+                                        Text(line.text)
+                                            .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
+                                            .foregroundColor(isCurrent ? .pukiAmber : .white.opacity(0.35))
+                                            .multilineTextAlignment(.center)
+                                            .scaleEffect(isCurrent ? 1.05 : 1.0)
+                                            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isCurrent)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .id(line.id)
                                 }
                             }
                             .padding(.horizontal, 24)
@@ -2176,16 +2129,38 @@ struct InlineLyricsPlayerView: View {
                 }
             } else {
                 Spacer()
-                Text("Lirik tidak tersedia")
-                    .foregroundColor(.pukiTextSecondary)
+                VStack(spacing: 8) {
+                    Image(systemName: "quote.bubble")
+                        .font(.system(size: 32))
+                        .foregroundColor(.pukiTextSecondary)
+                    Text("Lirik tidak tersedia untuk lagu ini")
+                        .font(.system(size: 13))
+                        .foregroundColor(.pukiTextSecondary)
+                }
                 Spacer()
             }
         }
         .task {
-            if let track = playerManager.currentTrack {
-                self.lyrics = await LyricsService.shared.getLyrics(track: track)
-                self.isLoading = false
+            await reloadLyrics()
+        }
+        .onChange(of: playerManager.currentTrack?.id) { _ in
+            Task {
+                await reloadLyrics()
             }
+        }
+    }
+    
+    private func reloadLyrics() async {
+        guard let track = playerManager.currentTrack else {
+            self.isLoading = false
+            return
+        }
+        self.isLoading = true
+        let res = await LyricsService.shared.getLyrics(track: track)
+        await MainActor.run {
+            self.lyrics = res
+            self.isLoading = false
+            self.currentLineId = nil
         }
     }
     
@@ -2327,5 +2302,55 @@ struct LyricsSheetView: View {
             return currentMs < allLines[idx + 1].timeMs
         }
         return true
+    }
+}
+
+// MARK: - Download Progress Button Component (1:1 Android)
+struct DownloadProgressButton: View {
+    let trackId: String
+    let onDownload: () -> Void
+    let onDelete: () -> Void
+    @ObservedObject var downloadService = DownloadService.shared
+    
+    var body: some View {
+        Button(action: {
+            if downloadService.isTrackOffline(trackId: trackId) {
+                onDelete()
+            } else {
+                onDownload()
+            }
+        }) {
+            ZStack {
+                if downloadService.downloadingTrackIds.contains(trackId) {
+                    let progress = downloadService.downloadProgress[trackId] ?? 0.05
+                    let percent = Int(progress * 100)
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.15), lineWidth: 2.5)
+                        Circle()
+                            .trim(from: 0, to: CGFloat(progress))
+                            .stroke(Color.pukiAmber, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .animation(.linear(duration: 0.2), value: progress)
+                        Text("\(percent)")
+                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            .foregroundColor(.pukiAmber)
+                    }
+                    .frame(width: 26, height: 26)
+                } else if downloadService.isTrackOffline(trackId: trackId) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 18))
+                        .frame(width: 26, height: 26)
+                } else {
+                    Image(systemName: "arrow.down.circle")
+                        .foregroundColor(.pukiTextSecondary.opacity(0.75))
+                        .font(.system(size: 18))
+                        .frame(width: 26, height: 26)
+                }
+            }
+        }
+        .buttonStyle(BorderlessButtonStyle())
+        .contentShape(Rectangle())
     }
 }

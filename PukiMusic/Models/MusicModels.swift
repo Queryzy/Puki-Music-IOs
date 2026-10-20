@@ -20,10 +20,11 @@ struct Track: Identifiable, Codable, Equatable {
     var highResThumbnailUrl: String {
         var url = thumbnailUrl
         if url.contains("deezer.com") {
-            // Replace /250x250- or /500x500- with /1000x1000-
+            // Replace any size with /1000x1000-
             url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
             url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
             url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/56x56-", with: "/1000x1000-")
         } else if url.contains("ytimg.com") || url.contains("ggpht.com") {
             url = url.replacingOccurrences(of: "hqdefault.jpg", with: "maxresdefault.jpg")
             url = url.replacingOccurrences(of: "mqdefault.jpg", with: "maxresdefault.jpg")
@@ -31,6 +32,43 @@ struct Track: Identifiable, Codable, Equatable {
             url = url.replacingOccurrences(of: "default.jpg", with: "maxresdefault.jpg")
             url = url.replacingOccurrences(of: "=w120-h120", with: "=w1000-h1000")
             url = url.replacingOccurrences(of: "=s120", with: "=s1000")
+            url = url.replacingOccurrences(of: "=s60", with: "=s1000")
+        }
+        return url
+    }
+}
+
+extension DeezerTrack {
+    var highResCoverUrl: String {
+        var url = coverUrl
+        if url.contains("deezer.com") {
+            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+        }
+        return url
+    }
+}
+
+extension DeezerAlbum {
+    var highResCoverUrl: String {
+        var url = coverUrl
+        if url.contains("deezer.com") {
+            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+        }
+        return url
+    }
+}
+
+extension DeezerArtist {
+    var highResPictureUrl: String {
+        var url = pictureUrl
+        if url.contains("deezer.com") {
+            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
         }
         return url
     }

@@ -123,7 +123,8 @@ class DeezerService {
         let albumTitle = albumObj?["title"] as? String ?? ""
         let albumId = albumObj?["id"] as? Int64 ?? (albumObj?["id"] as? Int).map({ Int64($0) }) ?? 0
         
-        let cover = albumObj?["cover_big"] as? String ??
+        let cover = albumObj?["cover_xl"] as? String ??
+                    albumObj?["cover_big"] as? String ??
                     albumObj?["cover_medium"] as? String ??
                     albumObj?["cover"] as? String ?? ""
         
@@ -153,7 +154,8 @@ class DeezerService {
         let artistName = artistObj?["name"] as? String ?? ""
         let artistId = artistObj?["id"] as? Int64 ?? (artistObj?["id"] as? Int).map({ Int64($0) }) ?? 0
         
-        let cover = item["cover_big"] as? String ??
+        let cover = item["cover_xl"] as? String ??
+                    item["cover_big"] as? String ??
                     item["cover_medium"] as? String ??
                     item["cover"] as? String ?? ""
         
@@ -177,7 +179,8 @@ class DeezerService {
         guard let id = item["id"] as? Int64 ?? (item["id"] as? Int).map({ Int64($0) }),
               let name = item["name"] as? String else { return nil }
         
-        let picture = item["picture_big"] as? String ??
+        let picture = item["picture_xl"] as? String ??
+                      item["picture_big"] as? String ??
                       item["picture_medium"] as? String ??
                       item["picture"] as? String ?? ""
         

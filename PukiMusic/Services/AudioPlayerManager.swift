@@ -168,7 +168,7 @@ class AudioPlayerManager: ObservableObject {
         
         // 1. Matikan audio spatialization dinamis iOS agar volume tidak pumping/berubah saat bergerak ([] = None / turn off spatialization)
         playerItem.allowedAudioSpatializationFormats = []
-        // 2. Kunci algoritma pitch/timestretch murni tanpa kompresi gain dinamis
+        // Kunci algoritma pitch/timestretch murni tanpa kompresi gain dinamis
         playerItem.audioTimePitchAlgorithm = .spectral
         
         let newPlayer = AVPlayer(playerItem: playerItem)
@@ -182,15 +182,6 @@ class AudioPlayerManager: ObservableObject {
         newPlayer.preventsDisplaySleepDuringVideoPlayback = false
         
         player = newPlayer
-        
-        // Matikan video track pada asset item agar CoreAudio memperlakukan stream sebagai pure audio
-        DispatchQueue.global(qos: .userInitiated).async {
-            for track in playerItem.tracks {
-                if track.assetTrack?.mediaType == .video {
-                    track.isEnabled = false
-                }
-            }
-        }
         
         // Add periodic time observer (every 0.1s for buttery smooth lyrics sync)
         let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))

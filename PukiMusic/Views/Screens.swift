@@ -1198,18 +1198,120 @@ struct ChangelogSheetView: View {
     }
 }
 
+// MARK: - Add To Playlist Modal Sheet
+struct AddToPlaylistSheetView: View {
+    let track: Track
+    @ObservedObject var store = LocalMusicStore.shared
+    @Environment(\.dismiss) var dismiss
+    @State private var showingNewPlaylist = false
+    @State private var newName = ""
+    
+    var body: some View {
+        ZStack {
+            Color.pukiBackground.ignoresSafeArea()
+            VStack(spacing: 16) {
+                HStack {
+                    Text("TAMBAHKAN KE PLAYLIST")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.pukiCoral)
+                        .tracking(1)
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                
+                Button(action: { showingNewPlaylist = true }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.pukiAmber)
+                        Text("Buat Playlist Baru")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                        Spacer()
+                    }
+                    .padding(14)
+                    .background(Color.pukiCard)
+                    .cornerRadius(12)
+                    .padding(.horizontal, 20)
+                }
+                
+                if store.playlists.isEmpty {
+                    Spacer()
+                    Text("Belum ada playlist yang dibuat.")
+                        .foregroundColor(.pukiTextSecondary)
+                        .font(.system(size: 14))
+                    Spacer()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(store.playlists) { pl in
+                                let alreadyAdded = pl.tracks.contains(where: { $0.id == track.id })
+                                Button(action: {
+                                    if !alreadyAdded {
+                                        store.addTrackToPlaylist(playlistId: pl.id, track: track)
+                                    }
+                                    dismiss()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "music.note.list")
+                                            .foregroundColor(.pukiCoral)
+                                        Text(pl.name)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                        if alreadyAdded {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(.pukiAmber)
+                                                .font(.system(size: 14, weight: .bold))
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(Color.pukiCard)
+                                    .cornerRadius(10)
+                                    .padding(.horizontal, 20)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .alert("Playlist Baru", isPresented: $showingNewPlaylist) {
+            TextField("Nama Playlist", text: $newName)
+            Button("Batal", role: .cancel) { newName = "" }
+            Button("Simpan") {
+                store.createPlaylist(name: newName)
+                if let last = store.playlists.last {
+                    store.addTrackToPlaylist(playlistId: last.id, track: track)
+                }
+                newName = ""
+                dismiss()
+            }
+        }
+    }
+}
+
 // MARK: - Full Screen Player View
 struct FullScreenPlayerView: View {
     let onLyricsTap: () -> Void
     @EnvironmentObject var playerManager: AudioPlayerManager
     @Environment(\.dismiss) var dismiss
+    @ObservedObject var store = LocalMusicStore.shared
+    @State private var showingAddToPlaylist = false
+    @State private var showLyricsInline = false
     
     var body: some View {
         ZStack {
             Color.pukiBackground.ignoresSafeArea()
             
             if let track = playerManager.currentTrack {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     // Header dismiss
                     HStack {
                         Button(action: { dismiss() }) {
@@ -1222,42 +1324,74 @@ struct FullScreenPlayerView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.pukiTextSecondary)
                         Spacer()
-                        Button(action: onLyricsTap) {
-                            Image(systemName: "quote.bubble.fill")
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showLyricsInline.toggle()
+                            }
+                        }) {
+                            Image(systemName: showLyricsInline ? "music.note" : "quote.bubble.fill")
                                 .font(.system(size: 20))
-                                .foregroundColor(.pukiCoral)
+                                .foregroundColor(showLyricsInline ? .pukiAmber : .pukiCoral)
                         }
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
                     
-                    Spacer()
-                    
-                    // Big Artwork
-                    AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: {
-                        Color.pukiCardElevated
-                    }
-                    .frame(width: 300, height: 300)
-                    .cornerRadius(16)
-                    .shadow(color: Color.pukiMagenta.opacity(0.3), radius: 20, x: 0, y: 10)
-                    
-                    Spacer()
-                    
-                    // Title & Artist
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(track.title)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
+                    if showLyricsInline {
+                        // In-Player Interactive Realtime Lyrics View
+                        InlineLyricsPlayerView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        Spacer()
                         
-                        Text(track.artist)
-                            .font(.system(size: 15))
-                            .foregroundColor(.pukiTextSecondary)
-                            .lineLimit(1)
+                        // Big Artwork
+                        AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
+                            img.resizable().scaledToFill()
+                        } placeholder: {
+                            Color.pukiCardElevated
+                        }
+                        .frame(width: 290, height: 290)
+                        .cornerRadius(16)
+                        .shadow(color: Color.pukiMagenta.opacity(0.35), radius: 24, x: 0, y: 12)
+                        
+                        Spacer()
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Title, Artist, & Action Buttons (Favorite + Add to Playlist)
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(track.title)
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            
+                            Text(track.artist)
+                                .font(.system(size: 15))
+                                .foregroundColor(.pukiTextSecondary)
+                                .lineLimit(1)
+                        }
+                        
+                        Spacer()
+                        
+                        // Add to Playlist Button
+                        Button(action: { showingAddToPlaylist = true }) {
+                            Image(systemName: "plus.rectangle.on.rectangle")
+                                .font(.system(size: 20))
+                                .foregroundColor(.pukiTextSecondary)
+                        }
+                        .padding(.trailing, 12)
+                        
+                        // Favorite Heart Button
+                        Button(action: {
+                            store.toggleFavorite(track: track)
+                        }) {
+                            Image(systemName: store.isFavorite(trackId: track.id) ? "heart.fill" : "heart")
+                                .font(.system(size: 22))
+                                .foregroundColor(store.isFavorite(trackId: track.id) ? .pukiCoral : .white)
+                                .scaleEffect(store.isFavorite(trackId: track.id) ? 1.15 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: store.isFavorite(trackId: track.id))
+                        }
+                    }
                     .padding(.horizontal, 28)
                     
                     // Slider
@@ -1316,12 +1450,102 @@ struct FullScreenPlayerView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAddToPlaylist) {
+            if let tr = playerManager.currentTrack {
+                AddToPlaylistSheetView(track: tr)
+                    .presentationDetents([.medium, .large])
+            }
+        }
     }
     
     private func formatTime(_ sec: Double) -> String {
         let m = Int(sec) / 60
         let s = Int(sec) % 60
         return String(format: "%d:%02d", m, s)
+    }
+}
+
+// MARK: - Inline Lyrics Player View (Embedded inside Now Playing Screen)
+struct InlineLyricsPlayerView: View {
+    @EnvironmentObject var playerManager: AudioPlayerManager
+    @State private var lyrics: LyricsResult?
+    @State private var isLoading = true
+    @State private var currentLineId: Int64? = nil
+    
+    var body: some View {
+        VStack {
+            if isLoading {
+                Spacer()
+                ProgressView().tint(.pukiCoral)
+                Spacer()
+            } else if let lrc = lyrics {
+                if lrc.isSynced && !lrc.lines.isEmpty {
+                    ScrollViewReader { proxy in
+                        ScrollView(showsIndicators: false) {
+                            VStack(spacing: 24) {
+                                ForEach(lrc.lines) { line in
+                                    let isCurrent = isLineActive(line, allLines: lrc.lines)
+                                    Text(line.text)
+                                        .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
+                                        .foregroundColor(isCurrent ? .pukiAmber : .white.opacity(0.35))
+                                        .multilineTextAlignment(.center)
+                                        .scaleEffect(isCurrent ? 1.05 : 1.0)
+                                        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isCurrent)
+                                        .id(line.id)
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 30)
+                        }
+                        .onChange(of: playerManager.currentTime) { _ in
+                            updateCurrentLine(lines: lrc.lines, proxy: proxy)
+                        }
+                    }
+                } else if let plain = lrc.plainLyrics {
+                    ScrollView {
+                        Text(plain)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .lineSpacing(8)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 30)
+                    }
+                }
+            } else {
+                Spacer()
+                Text("Lirik tidak tersedia")
+                    .foregroundColor(.pukiTextSecondary)
+                Spacer()
+            }
+        }
+        .task {
+            if let track = playerManager.currentTrack {
+                self.lyrics = await LyricsService.shared.getLyrics(track: track)
+                self.isLoading = false
+            }
+        }
+    }
+    
+    private func updateCurrentLine(lines: [LyricLine], proxy: ScrollViewProxy) {
+        let currentMs = Int64(playerManager.currentTime * 1000)
+        guard let active = lines.last(where: { currentMs >= $0.timeMs }) else { return }
+        if currentLineId != active.id {
+            currentLineId = active.id
+            withAnimation(.easeInOut(duration: 0.3)) {
+                proxy.scrollTo(active.id, anchor: .center)
+            }
+        }
+    }
+    
+    private func isLineActive(_ line: LyricLine, allLines: [LyricLine]) -> Bool {
+        let currentMs = Int64(playerManager.currentTime * 1000)
+        guard currentMs >= line.timeMs else { return false }
+        if let idx = allLines.firstIndex(where: { $0.id == line.id }),
+           idx + 1 < allLines.count {
+            return currentMs < allLines[idx + 1].timeMs
+        }
+        return true
     }
 }
 

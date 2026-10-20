@@ -14,10 +14,11 @@ targets:
         UILaunchScreen: {}
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.puki.music.ios
-      MARKETING_VERSION: "1.0.5"
-      CURRENT_PROJECT_VERSION: "5"
+      MARKETING_VERSION: "1.0.6"
+      CURRENT_PROJECT_VERSION: "6"
       ENABLE_BITCODE: NO
       SWIFT_VERSION: "5.0"
       INFOPLIST_FILE: PukiMusic/Info.plist
+      INFOPLIST_KEY_UIBackgroundModes: "audio"
       TARGETED_DEVICE_FAMILY: "1" # iPhone only
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

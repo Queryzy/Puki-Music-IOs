@@ -126,11 +126,18 @@ class LyricsService {
     }
     
     private func clean(_ str: String) -> String {
-        return str
-            .replacingOccurrences(of: "(Official Music Video)", with: "", options: .caseInsensitive)
-            .replacingOccurrences(of: "(Official Video)", with: "", options: .caseInsensitive)
-            .replacingOccurrences(of: "(Official Audio)", with: "", options: .caseInsensitive)
-            .replacingOccurrences(of: "[MV]", with: "", options: .caseInsensitive)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var res = str
+        let patterns = [
+            "(?i)\\b(official|music|video|audio|remastered|remaster|hd|4k|hq|visualizer|lyric video|lyrics|explicit|clean|original soundtrack|ost)\\b",
+            "(?i)\\s*-\\s*(from|live|acoustic|instrumental|theme).*",
+            "(?i)\\(.*?\\)",
+            "(?i)\\[.*?\\]",
+            "(?i)ft\\..*",
+            "(?i)feat\\..*"
+        ]
+        for p in patterns {
+            res = res.replacingOccurrences(of: p, with: "", options: .regularExpression)
+        }
+        return res.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

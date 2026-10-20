@@ -47,16 +47,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.5
-          name: "Puki Music iOS v1.0.5"
+          tag_name: v1.0.6
+          name: "Puki Music iOS v1.0.6"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.5
-            - **Background Audio & Lockscreen Controls**: Continuous background playback when app is minimized or notification shade is pulled down. Full MPRemoteCommandCenter and lockscreen media art integration.
-            - **Realtime Lyrics Sync**: Lyrics auto-scroll and highlight matching playback time.
-            - **Playlist, Favorites, & Offline UI**: Create and manage local playlists, save favorites, and manage storage.
-            - **UI Polish**: Album sheet presentation avoids mini-player collision; bottom navigation bar aligned to standard iOS safe margins.
-            - **Branding**: Official Puki Music logo added to Home Header.
-            - **Changelog & Cache Cleaner**: Added in-app release notes dialog and disk space cleaner.
+            ## Puki Music iOS Native (SwiftUI) v1.0.6
+            - **Background Audio Capability**: Added INFOPLIST_KEY_UIBackgroundModes audio in project.yml for xcodegen. Uninterrupted playback when navigating away, pulling notification shade, or locking screen.
+            - **Eliminated Double Playback**: Removed Deezer 30s preview fallback so tracks play directly from full YouTube stream once resolved without stutter.
+            - **Now Playing Player 1:1**: Integrated Favorite Heart button, Add to Playlist Sheet, and in-player lyrics view.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

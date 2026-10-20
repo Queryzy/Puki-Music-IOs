@@ -72,12 +72,11 @@ class AudioPlayerManager: ObservableObject {
         self.currentTime = 0
         self.duration = Double(track.durationSeconds)
         
-        // 1. Instant fallback if track already has streamUrl (e.g. Deezer Preview)
-        if let streamUrlStr = track.streamUrl, let url = URL(string: streamUrlStr) {
-            setupPlayer(url: url, track: track)
-        }
+        // Hentikan player lama agar tidak memutar potongan preview
+        self.player?.pause()
+        self.isPlaying = false
         
-        // 2. Asynchronously resolve full YouTube stream in background
+        // Resolve full YouTube stream langsung (tanpa double playback preview Deezer)
         Task {
             if let resolvedUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
                 title: track.title,
@@ -86,12 +85,20 @@ class AudioPlayerManager: ObservableObject {
             ), let resolvedUrl = URL(string: resolvedUrlStr) {
                 var updatedTrack = track
                 updatedTrack.streamUrl = resolvedUrlStr
-                self.currentTrack = updatedTrack
-                setupPlayer(url: resolvedUrl, track: updatedTrack)
-            } else if track.streamUrl == nil {
-                // If resolving failed and no fallback stream exists, stop buffering
-                self.isBuffering = false
-                self.isPlaying = false
+                await MainActor.run {
+                    self.currentTrack = updatedTrack
+                    self.setupPlayer(url: resolvedUrl, track: updatedTrack)
+                }
+            } else if let fallbackPreview = track.streamUrl, let previewUrl = URL(string: fallbackPreview) {
+                // Hanya fallback ke preview jika YouTube resolver benar-benar gagal
+                await MainActor.run {
+                    self.setupPlayer(url: previewUrl, track: track)
+                }
+            } else {
+                await MainActor.run {
+                    self.isBuffering = false
+                    self.isPlaying = false
+                }
             }
         }
     }
@@ -106,8 +113,8 @@ class AudioPlayerManager: ObservableObject {
         newPlayer.automaticallyWaitsToMinimizeStalling = false
         player = newPlayer
         
-        // Add periodic time observer (every 0.25s)
-        let interval = CMTime(seconds: 0.25, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        // Add periodic time observer (every 0.1s for buttery smooth lyrics sync)
+        let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self = self else { return }
             self.currentTime = time.seconds

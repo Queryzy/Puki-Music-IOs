@@ -182,6 +182,8 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 self.downloadingTrackIds.remove(tid)
                 self.downloadProgress.removeValue(forKey: tid)
             }
+            self.taskToTrackId.removeValue(forKey: downloadTask.taskIdentifier)
+            self.activeTasks.removeValue(forKey: tid)
             self.endBgTask(for: tid)
             return
         }
@@ -194,6 +196,8 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 self.downloadingTrackIds.remove(tid)
                 self.downloadProgress.removeValue(forKey: tid)
             }
+            self.taskToTrackId.removeValue(forKey: downloadTask.taskIdentifier)
+            self.activeTasks.removeValue(forKey: tid)
             self.endBgTask(for: tid)
             return
         }

@@ -430,65 +430,55 @@ struct SearchTabView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        // Section Album Terkait (Tampil List Vertikal ke Bawah persis Android)
+                        // Section Album Terkait (Tampil Horizontal Swipe persis Android 1:1)
                         if (selectedFilter == 0 || selectedFilter == 2) && !albumResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 10) {
                                 HStack {
                                     Image(systemName: "opticaldisc.fill")
                                         .foregroundColor(.pukiCoral)
                                         .font(.system(size: 14))
                                     Text("ALBUM RESMI TERKAIT (\(albumResults.count))")
-                                        .font(.system(size: 13, weight: .bold))
+                                        .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(.pukiCoral)
                                     Spacer()
                                 }
                                 .padding(.horizontal, 20)
                                 
-                                ForEach(albumResults) { album in
-                                    Button(action: {
-                                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
-                                    }) {
-                                        HStack(spacing: 14) {
-                                            AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
-                                                img.resizable().scaledToFill()
-                                            } placeholder: {
-                                                Color.pukiCardElevated
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    LazyHStack(spacing: 12) {
+                                        ForEach(albumResults) { album in
+                                            Button(action: {
+                                                NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
+                                            }) {
+                                                VStack(alignment: .leading, spacing: 6) {
+                                                    AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
+                                                        img.resizable().scaledToFill()
+                                                    } placeholder: {
+                                                        Color.pukiCardElevated
+                                                    }
+                                                    .frame(width: 130, height: 130)
+                                                    .cornerRadius(10)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 10)
+                                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                                    )
+                                                    
+                                                    Text(album.title)
+                                                        .font(.system(size: 13, weight: .bold))
+                                                        .foregroundColor(.white)
+                                                        .lineLimit(1)
+                                                        .frame(width: 130, alignment: .leading)
+                                                    
+                                                    Text(album.artistName)
+                                                        .font(.system(size: 11))
+                                                        .foregroundColor(.pukiAmber)
+                                                        .lineLimit(1)
+                                                        .frame(width: 130, alignment: .leading)
+                                                }
                                             }
-                                            .frame(width: 64, height: 64)
-                                            .cornerRadius(10)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                            )
-                                            
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(album.title)
-                                                    .font(.system(size: 15, weight: .bold))
-                                                    .foregroundColor(.white)
-                                                    .lineLimit(1)
-                                                
-                                                Text("\(album.artistName)")
-                                                    .font(.system(size: 13))
-                                                    .foregroundColor(.pukiAmber)
-                                                    .lineLimit(1)
-                                                
-                                                Text("\(album.trackCount > 0 ? "\(album.trackCount) Lagu" : "Album Resmi") • Ketuk untuk buka diskografi")
-                                                    .font(.system(size: 11))
-                                                    .foregroundColor(.pukiTextSecondary)
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.pukiTextSecondary)
-                                                .font(.system(size: 13, weight: .semibold))
                                         }
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
-                                        .background(Color.pukiCard)
-                                        .cornerRadius(12)
-                                        .padding(.horizontal, 20)
                                     }
+                                    .padding(.horizontal, 20)
                                 }
                             }
                         }
@@ -602,7 +592,17 @@ struct SearchTabView: View {
             
             let dzTracks = (try? await dzReq) ?? []
             let ytTracks = await ytReq
-            let albums = (try? await albumsReq) ?? []
+            let rawAlbums = (try? await albumsReq) ?? []
+            
+            // Filter album cerdas (1:1 Android StreamResolver relevance matching):
+            // Prioritaskan album yang nama artisnya atau judulnya mengandung query pencarian
+            let qLower = q.lowercased()
+            let filteredAlbums = rawAlbums.filter { alb in
+                let aLower = alb.artistName.lowercased()
+                let tLower = alb.title.lowercased()
+                return aLower.contains(qLower) || tLower.contains(qLower) || qLower.contains(aLower)
+            }
+            let albums = filteredAlbums.isEmpty ? rawAlbums : filteredAlbums
             
             // Map Deezer ke domain Track
             let mappedDzTracks: [Track] = dzTracks.map { dz in
@@ -1187,6 +1187,11 @@ struct PlaylistDetailSheetView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var playerManager: AudioPlayerManager
     @ObservedObject var store = LocalMusicStore.shared
+    @ObservedObject var downloadService = DownloadService.shared
+    
+    private var livePlaylist: Playlist {
+        return store.playlists.first(where: { $0.id == playlist.id }) ?? playlist
+    }
     
     var body: some View {
         ZStack {
@@ -1205,12 +1210,12 @@ struct PlaylistDetailSheetView: View {
                             .foregroundColor(.pukiTextSecondary)
                     }
                     Spacer()
-                    Text(playlist.name.uppercased())
+                    Text(livePlaylist.name.uppercased())
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.pukiAmber)
                     Spacer()
                     Button(action: {
-                        store.deletePlaylist(id: playlist.id)
+                        store.deletePlaylist(id: livePlaylist.id)
                         if let onDismiss = onDismiss {
                             onDismiss()
                         } else {
@@ -1226,11 +1231,11 @@ struct PlaylistDetailSheetView: View {
                 .padding(.top, 16)
                 
                 // Header Action: Play All & Download Playlist
-                if !playlist.tracks.isEmpty {
+                if !livePlaylist.tracks.isEmpty {
                     HStack(spacing: 12) {
                         Button(action: {
-                            if let first = playlist.tracks.first {
-                                playerManager.play(track: first, fromQueue: playlist.tracks)
+                            if let first = livePlaylist.tracks.first {
+                                playerManager.play(track: first, fromQueue: livePlaylist.tracks)
                             }
                         }) {
                             HStack {
@@ -1248,7 +1253,7 @@ struct PlaylistDetailSheetView: View {
                         
                         Button(action: {
                             // Real Background Download All tracks in Playlist (1:1 Android)
-                            for t in playlist.tracks {
+                            for t in livePlaylist.tracks {
                                 DownloadService.shared.downloadTrack(track: t)
                             }
                         }) {
@@ -1268,7 +1273,7 @@ struct PlaylistDetailSheetView: View {
                     .padding(.horizontal, 20)
                 }
                 
-                if playlist.tracks.isEmpty {
+                if livePlaylist.tracks.isEmpty {
                     Spacer()
                     VStack(spacing: 8) {
                         Image(systemName: "music.note")
@@ -1282,12 +1287,12 @@ struct PlaylistDetailSheetView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 8) {
-                            ForEach(Array(playlist.tracks.enumerated()), id: \.element.id) { idx, t in
+                            ForEach(Array(livePlaylist.tracks.enumerated()), id: \.element.id) { idx, t in
                                 Button(action: {
-                                    playerManager.play(track: t, fromQueue: playlist.tracks)
+                                    playerManager.play(track: t, fromQueue: livePlaylist.tracks)
                                 }) {
                                     HStack(spacing: 12) {
-                                        if !t.thumbnailUrl.isEmpty {
+                                        if !t.highResThumbnailUrl.isEmpty {
                                             AsyncImage(url: URL(string: t.highResThumbnailUrl)) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {

@@ -47,14 +47,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.14
-          name: "Puki Music iOS v1.0.14"
+          tag_name: v1.0.15
+          name: "Puki Music iOS v1.0.15"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.14
-            - **Dual Search Engine (1:1 Android)**: Parallel YouTube Music & Deezer search; accurate Indonesian/local tracks (Noah, Peterpan, dll).
-            - **Smart Fallback Downloader**: Multi-query sanitize and direct YouTube video resolver for imported playlists.
-            - **Official & Popular Badges**: Added `💿 OFFICIAL • HD` and `🔥 POPULER` badges across all lists.
-            - **Playlist Artwork**: Added high-res thumbnail covers in playlist tracks view.
+            ## Puki Music iOS Native (SwiftUI) v1.0.15
+            - **Playlist Live Sync & Downloader**: Fixed playlist detail live state binding to download service and local store.
+            - **Auto Fallback Thumbnail**: Added automatic fallback to YouTube / Deezer CDN thumbnail when imported tracks have empty thumbnail URLs.
+            - **Horizontal Carousel Albums**: Upgraded album results to horizontal swipe layout (1:1 Android) with strict artist name matching.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

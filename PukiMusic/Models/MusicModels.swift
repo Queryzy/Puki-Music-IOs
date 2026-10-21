@@ -19,6 +19,14 @@ struct Track: Identifiable, Codable, Equatable {
     /// Auto-upscale low-res thumbnails to sharp 500x500 or hqdefault without 404 risk (1:1 Android)
     var highResThumbnailUrl: String {
         var url = thumbnailUrl
+        
+        // 1. Jika thumbnailUrl kosong, buat fallback langsung dari track ID
+        if url.isEmpty {
+            if !id.hasPrefix("dz_") && id.count == 11 {
+                return "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"
+            }
+        }
+        
         if url.contains("deezer.com") {
             // Deezer 500x500 is 100% available across all tracks and albums without 404
             url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")

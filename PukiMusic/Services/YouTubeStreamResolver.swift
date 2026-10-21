@@ -175,14 +175,14 @@ class YouTubeStreamResolver {
                     }
                     
                     tracks.append(Track(
-                        id = videoId,
-                        title = title,
-                        artist = artist.isEmpty ? "YouTube Music" : artist,
-                        durationSeconds = durationSec,
-                        thumbnailUrl = thumbUrl,
-                        streamUrl = nil,
-                        viewCount = viewCount,
-                        likeCount = 0
+                        id: videoId,
+                        title: title,
+                        artist: artist.isEmpty ? "YouTube Music" : artist,
+                        durationSeconds: durationSec,
+                        thumbnailUrl: thumbUrl,
+                        streamUrl: nil,
+                        viewCount: viewCount,
+                        likeCount: 0
                     ))
                     
                     if tracks.count >= 25 { break }

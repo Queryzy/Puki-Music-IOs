@@ -92,8 +92,11 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
             }
             
             // 3. Jika track.streamUrl masih kosong, coba fetch track detail langsung dari Deezer API untuk preview mp3
-            if streamUrlStr == nil, let dzId = Int64(track.id.replacingOccurrences(of: "dz_", with: "")) {
-                if let dzTrack = await DeezerService.shared.getTrack(id: dzId), let pUrl = dzTrack.previewUrl, !pUrl.isEmpty {
+            if streamUrlStr == nil, let dzId = Int64(track.id.replacingOccurrences(of: "dz_", with: "")),
+               let dzUrl = URL(string: "https://api.deezer.com/track/\(dzId)") {
+                if let (data, _) = try? await self.downloadSession.data(from: dzUrl),
+                   let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                   let pUrl = json["preview"] as? String, !pUrl.isEmpty {
                     streamUrlStr = pUrl
                 }
             }

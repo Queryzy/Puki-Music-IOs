@@ -391,13 +391,17 @@ class LocalMusicStore: ObservableObject {
         var importedPls = 0
         
         func sanitizeThumb(id: String, thumb: String) -> String {
-            let t = thumb.trimmingCharacters(in: .whitespacesAndNewlines)
+            var t = thumb.trimmingCharacters(in: .whitespacesAndNewlines)
             if t.hasPrefix("http://") || t.hasPrefix("https://") {
+                if t.contains("ytimg.com"), let qIdx = t.firstIndex(of: "?") {
+                    t = String(t[..<qIdx])
+                }
                 return t
             }
             // Jika thumb berisi path lokal Android (/data/...) atau kosong, buat URL publik resmi
-            if id.count == 11 && !id.hasPrefix("dz_") {
-                return "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"
+            let cleanVid = Track.normalizeId(id)
+            if !id.hasPrefix("dz_") && !cleanVid.isEmpty {
+                return "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
             }
             return ""
         }

@@ -133,10 +133,11 @@ class AudioPlayerManager: ObservableObject {
             return
         }
         Task {
-            // 0b. Jika track.id adalah YouTube videoId langsung (11 karakter, bukan diawali dz_)
+            // 0b. Jika track.id adalah YouTube URL atau videoId langsung (1:1 Android)
             var resolvedUrlStr: String? = nil
-            if !track.id.hasPrefix("dz_") && track.id.count == 11 {
-                resolvedUrlStr = await YouTubeStreamResolver.shared.resolveAudioCdnUrl(videoId: track.id)
+            let cleanVid = Track.normalizeId(track.id)
+            if !track.id.hasPrefix("dz_") && !cleanVid.isEmpty {
+                resolvedUrlStr = await YouTubeStreamResolver.shared.resolveAudioCdnUrl(videoId: cleanVid)
             }
             
             if resolvedUrlStr == nil {

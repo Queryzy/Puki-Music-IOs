@@ -10,6 +10,24 @@ struct Track: Identifiable, Codable, Equatable {
     var viewCount: Int64 = 0
     var likeCount: Int64 = 0
     
+    /// Normalisasi Track ID (1:1 Android LocalMusicStore.normalizeId)
+    static func normalizeId(_ rawId: String) -> String {
+        var id = rawId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if id.contains("v=") {
+            id = id.components(separatedBy: "v=").last?.components(separatedBy: "&").first ?? id
+        } else if id.contains("youtu.be/") {
+            id = id.components(separatedBy: "youtu.be/").last?.components(separatedBy: "?").first ?? id
+        }
+        return id.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+    
+    /// Sanitasi nama file agar aman di POSIX filesystem (1:1 Android OfflineManager.sanitizeFilename)
+    static func sanitizeFilename(_ rawId: String) -> String {
+        let norm = normalizeId(rawId)
+        let invalidCharacters = CharacterSet(charactersIn: ":/?#[]@!$&'()*+,;=\"\\%<>|^~`")
+        return norm.components(separatedBy: invalidCharacters).joined(separator: "_")
+    }
+    
     var formattedDuration: String {
         let minutes = durationSeconds / 60
         let seconds = durationSeconds % 60
@@ -30,10 +48,18 @@ struct Track: Identifiable, Codable, Equatable {
             url = ""
         }
         
-        // 2. Jika thumbnailUrl kosong, buat fallback langsung dari track ID YouTube
+        // 2. Normalisasi YouTube ID untuk cover fallback
+        let cleanVid = Track.normalizeId(id)
         if url.isEmpty {
-            if !id.hasPrefix("dz_") && id.count == 11 {
-                return "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"
+            if !id.hasPrefix("dz_") && (cleanVid.count == 11 || !cleanVid.isEmpty) {
+                return "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
+            }
+        }
+        
+        // 3. Bersihkan token expired query parameter (?sqp=...) dari thumbnail YouTube
+        if url.contains("ytimg.com") {
+            if let qIdx = url.firstIndex(of: "?") {
+                url = String(url[..<qIdx])
             }
         }
         

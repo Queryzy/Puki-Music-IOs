@@ -44,13 +44,14 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     func getLocalAudioFileUrl(for trackId: String) -> URL? {
-        let m4aFile = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
+        let safeName = Track.sanitizeFilename(trackId)
+        let m4aFile = getOfflineDirectory().appendingPathComponent("\(safeName).m4a")
         if FileManager.default.fileExists(atPath: m4aFile.path),
            let attrs = try? FileManager.default.attributesOfItem(atPath: m4aFile.path),
            let size = attrs[.size] as? Int64, size > 150_000 {
             return m4aFile
         }
-        let mp3File = getOfflineDirectory().appendingPathComponent("\(trackId).mp3")
+        let mp3File = getOfflineDirectory().appendingPathComponent("\(safeName).mp3")
         if FileManager.default.fileExists(atPath: mp3File.path),
            let attrs = try? FileManager.default.attributesOfItem(atPath: mp3File.path),
            let size = attrs[.size] as? Int64, size > 150_000 {
@@ -61,7 +62,8 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     
     /// Cek file cover lokal offline (.jpg) untuk playback tanpa koneksi internet (1:1 Android)
     func getLocalCoverFileUrl(for trackId: String) -> URL? {
-        let jpgFile = getOfflineDirectory().appendingPathComponent("\(trackId).jpg")
+        let safeName = Track.sanitizeFilename(trackId)
+        let jpgFile = getOfflineDirectory().appendingPathComponent("\(safeName).jpg")
         if FileManager.default.fileExists(atPath: jpgFile.path),
            let attrs = try? FileManager.default.attributesOfItem(atPath: jpgFile.path),
            let size = attrs[.size] as? Int64, size > 500 {
@@ -79,7 +81,7 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         guard !isTrackOffline(trackId: tid), !downloadingTrackIds.contains(tid) else { return }
         
         // Mulai iOS background task agar download tidak diputus saat user minimize aplikasi
-        let bgTask = UIApplication.shared.beginBackgroundTask(withName: "PukiDownload_\(tid)") { [weak self] in
+        let bgTask = UIApplication.shared.beginBackgroundTask(withName: "PukiDownload_\(Track.sanitizeFilename(tid))") { [weak self] in
             self?.endBgTask(for: tid)
         }
         backgroundTaskIds[tid] = bgTask
@@ -90,10 +92,11 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         }
         
         Task {
-            // 0. Jika track.id adalah YouTube videoId langsung (11 karakter, bukan diawali dz_)
+            // 0. Jika track.id adalah YouTube URL atau videoId langsung (1:1 Android)
             var streamUrlStr: String? = nil
-            if !track.id.hasPrefix("dz_") && track.id.count == 11 {
-                streamUrlStr = await YouTubeStreamResolver.shared.resolveAudioCdnUrl(videoId: track.id)
+            let cleanVid = Track.normalizeId(track.id)
+            if !track.id.hasPrefix("dz_") && !cleanVid.isEmpty {
+                streamUrlStr = await YouTubeStreamResolver.shared.resolveAudioCdnUrl(videoId: cleanVid)
             }
             
             // 1. Resolve full stream URL via YouTube InnerTube
@@ -154,9 +157,10 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     func deleteDownloadedTrack(trackId: String) {
-        let m4aFile = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
-        let mp3File = getOfflineDirectory().appendingPathComponent("\(trackId).mp3")
-        let jpgFile = getOfflineDirectory().appendingPathComponent("\(trackId).jpg")
+        let safeName = Track.sanitizeFilename(trackId)
+        let m4aFile = getOfflineDirectory().appendingPathComponent("\(safeName).m4a")
+        let mp3File = getOfflineDirectory().appendingPathComponent("\(safeName).mp3")
+        let jpgFile = getOfflineDirectory().appendingPathComponent("\(safeName).jpg")
         try? FileManager.default.removeItem(at: m4aFile)
         try? FileManager.default.removeItem(at: mp3File)
         try? FileManager.default.removeItem(at: jpgFile)
@@ -219,7 +223,8 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         let isMp3 = (downloadTask.response?.mimeType?.contains("audio/mpeg") == true) ||
                     (downloadTask.response?.mimeType?.contains("mp3") == true)
         let ext = isMp3 ? "mp3" : "m4a"
-        let dest = getOfflineDirectory().appendingPathComponent("\(tid).\(ext)")
+        let safeName = Track.sanitizeFilename(tid)
+        let dest = getOfflineDirectory().appendingPathComponent("\(safeName).\(ext)")
         
         // Bersihkan file lama jika ada sebelum replace
         try? FileManager.default.removeItem(at: dest)
@@ -232,7 +237,7 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
             let thumbUrlStr = metaTrack?.highResThumbnailUrl ?? ""
             if let thumbUrl = URL(string: thumbUrlStr), thumbUrl.scheme == "http" || thumbUrl.scheme == "https" {
                 Task {
-                    let coverDest = self.getOfflineDirectory().appendingPathComponent("\(tid).jpg")
+                    let coverDest = self.getOfflineDirectory().appendingPathComponent("\(safeName).jpg")
                     if !FileManager.default.fileExists(atPath: coverDest.path) {
                         if let (imgData, imgResp) = try? await self.downloadSession.data(from: thumbUrl),
                            let httpImg = imgResp as? HTTPURLResponse, httpImg.statusCode == 200, imgData.count > 500 {

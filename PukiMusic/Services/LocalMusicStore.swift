@@ -13,6 +13,7 @@ struct PlayHistoryItem: Identifiable, Codable {
     let artist: String
     let durationSeconds: Int64
     let thumbnailUrl: String
+    var streamUrl: String? = nil
     var playCount: Int
     var lastPlayed: Int64
 }
@@ -104,6 +105,7 @@ class LocalMusicStore: ObservableObject {
                 artist: track.artist,
                 durationSeconds: track.durationSeconds,
                 thumbnailUrl: track.thumbnailUrl,
+                streamUrl: track.streamUrl,
                 playCount: 1,
                 lastPlayed: now
             )

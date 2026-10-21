@@ -119,7 +119,8 @@ struct HomeDashboardView: View {
                                         title: item.title,
                                         artist: item.artist,
                                         durationSeconds: item.durationSeconds,
-                                        thumbnailUrl: item.thumbnailUrl
+                                        thumbnailUrl: item.thumbnailUrl,
+                                        streamUrl: item.streamUrl
                                     )
                                     Button(action: {
                                         playerManager.play(track: t)

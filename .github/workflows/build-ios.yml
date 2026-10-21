@@ -47,13 +47,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.11
-          name: "Puki Music iOS v1.0.11"
+          tag_name: v1.0.12
+          name: "Puki Music iOS v1.0.12"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.11
-            - **Definitive Audio & Background Fix**: Corrected AVAudioSession configuration to standard `.playback` without incompatible policy options on iOS 18.
-            - **Pure Audio Stream Resolution**: Switched to ANDROID_VR InnerTube client delivering pure AAC/m4a audio streams (itag 140 / 139) without video track constraints.
-            - **Resilient Offline Downloader**: Fixed chunked transfer percentage calculation and robust file transfer into the local container sandbox.
+            ## Puki Music iOS Native (SwiftUI) v1.0.12
+            - **Guaranteed Playback & Audio Output**: Added resilient direct audio preview fallback and play history stream preservation.
+            - **Seamless Offline Downloader**: Ensured chunked audio buffer writing and permanent sandboxed storage.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

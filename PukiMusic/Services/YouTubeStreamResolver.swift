@@ -27,14 +27,24 @@ class YouTubeStreamResolver {
         }
         
         // 1. Cari video ID di YouTube Music via multi-query bertingkat (1:1 Android StreamResolver)
-        guard let videoId = await searchBestYouTubeVideoId(title: title, artist: artist, durationSeconds: durationSeconds) else {
+        var videoId = await searchBestYouTubeVideoId(title: title, artist: artist, durationSeconds: durationSeconds)
+        
+        // 1b. Fallback: Jika search YouTube Music tidak menemukan ID, gunakan direct YouTube search
+        if videoId == nil {
+            let ytTracks = await searchYouTubeTracks(query: "\(artist) \(title)")
+            if let first = ytTracks.first {
+                videoId = first.id
+            }
+        }
+        
+        guard let resolvedVid = videoId else {
             return nil
         }
         
-        saveVideoIdCache(key: cacheKey, videoId: videoId)
+        saveVideoIdCache(key: cacheKey, videoId: resolvedVid)
         
         // 2. Resolve direct CDN audio streaming URL via YouTube Android InnerTube
-        return await resolveAudioCdnUrl(videoId: videoId)
+        return await resolveAudioCdnUrl(videoId: resolvedVid)
     }
     
     /// Cari YouTube Video ID paling pas via YouTube Music InnerTube search bertingkat
@@ -101,6 +111,88 @@ class YouTubeStreamResolver {
         }
         
         return nil
+    }
+    
+    /// Search YouTube langsung untuk track lokal/Indonesia (Noah, Peterpan, dll) - 1:1 Android
+    func searchYouTubeTracks(query: String) async -> [Track] {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://www.youtube.com/results?search_query=\(encoded)&sp=EgIQAQ%253D%253D") else {
+            return []
+        }
+        
+        var req = URLRequest(url: url)
+        req.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+        req.setValue("id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7", forHTTPHeaderField: "Accept-Language")
+        req.timeoutInterval = 8
+        
+        do {
+            let (data, resp) = try await session.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200,
+                  let html = String(data: data, encoding: .utf8) else {
+                return []
+            }
+            
+            // Ekstrak ytInitialData JSON
+            let pattern = "var ytInitialData = (\\{.*?\\});</script>"
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]),
+                  let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..<html.endIndex, in: html)),
+                  let r = Range(match.range(at: 1), in: html),
+                  let json = try? JSONSerialization.jsonObject(with: Data(html[r].utf8)) as? [String: Any] else {
+                return []
+            }
+            
+            let contents = (((json["contents"] as? [String: Any])?["twoColumnSearchResultsRenderer"] as? [String: Any])?["primaryContents"] as? [String: Any])?["sectionListRenderer"] as? [String: Any]
+            guard let sectionList = contents?["contents"] as? [[String: Any]] else { return [] }
+            
+            var tracks: [Track] = []
+            for sec in sectionList {
+                guard let itemSec = (sec["itemSectionRenderer"] as? [String: Any])?["contents"] as? [[String: Any]] else { continue }
+                for it in itemSec {
+                    guard let vr = it["videoRenderer"] as? [String: Any],
+                          let videoId = vr["videoId"] as? String else { continue }
+                    
+                    let titleRuns = (vr["title"] as? [String: Any])?["runs"] as? [[String: Any]] ?? []
+                    let title = titleRuns.compactMap { $0["text"] as? String }.joined()
+                    
+                    let ownerRuns = (vr["ownerText"] as? [String: Any])?["runs"] as? [[String: Any]] ?? []
+                    let artist = ownerRuns.compactMap { $0["text"] as? String }.joined().replacingOccurrences(of: " - Topic", with: "").trimmingCharacters(in: .whitespaces)
+                    
+                    let lengthText = (vr["lengthText"] as? [String: Any])?["simpleText"] as? String ?? ""
+                    let parts = lengthText.split(separator: ":").compactMap { Int64($0) }
+                    var durationSec: Int64 = 0
+                    if parts.count == 2 {
+                        durationSec = parts[0] * 60 + parts[1]
+                    } else if parts.count == 3 {
+                        durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2]
+                    }
+                    
+                    let thumbUrl = "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
+                    let viewCountText = (vr["viewCountText"] as? [String: Any])?["simpleText"] as? String ?? ""
+                    var viewCount: Int64 = 0
+                    if let rawNum = viewCountText.components(separatedBy: CharacterSet.decimalDigits.inverted).joined().nonEmpty,
+                       let num = Int64(rawNum) {
+                        viewCount = num
+                    }
+                    
+                    tracks.append(Track(
+                        id = videoId,
+                        title = title,
+                        artist = artist.isEmpty ? "YouTube Music" : artist,
+                        durationSeconds = durationSec,
+                        thumbnailUrl = thumbUrl,
+                        streamUrl = nil,
+                        viewCount = viewCount,
+                        likeCount = 0
+                    ))
+                    
+                    if tracks.count >= 25 { break }
+                }
+                if tracks.count >= 25 { break }
+            }
+            return tracks
+        } catch {
+            return []
+        }
     }
     
     private func cleanStr(_ str: String) -> String {
@@ -219,5 +311,11 @@ class YouTubeStreamResolver {
             return nil
         }
         return nil
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        return self.isEmpty ? nil : self
     }
 }

@@ -79,12 +79,20 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         }
         
         Task {
+            // 0. Jika track.id adalah YouTube videoId langsung (11 karakter, bukan diawali dz_)
+            var streamUrlStr: String? = nil
+            if !track.id.hasPrefix("dz_") && track.id.count == 11 {
+                streamUrlStr = await YouTubeStreamResolver.shared.resolveAudioCdnUrl(videoId: track.id)
+            }
+            
             // 1. Resolve full stream URL via YouTube InnerTube
-            var streamUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
-                title: track.title,
-                artist: track.artist,
-                durationSeconds: track.durationSeconds
-            )
+            if streamUrlStr == nil {
+                streamUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
+                    title: track.title,
+                    artist: track.artist,
+                    durationSeconds: track.durationSeconds
+                )
+            }
             
             // 2. Resilient Fallback: Jika YouTube stream kosong atau gagal, gunakan stream direct audio Deezer yang 100% selalu tembus di iOS
             if streamUrlStr == nil {

@@ -133,13 +133,23 @@ class AudioPlayerManager: ObservableObject {
             return
         }
         Task {
-            if let resolvedUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
-                title: track.title,
-                artist: track.artist,
-                durationSeconds: track.durationSeconds
-            ), let resolvedUrl = URL(string: resolvedUrlStr) {
+            // 0b. Jika track.id adalah YouTube videoId langsung (11 karakter, bukan diawali dz_)
+            var resolvedUrlStr: String? = nil
+            if !track.id.hasPrefix("dz_") && track.id.count == 11 {
+                resolvedUrlStr = await YouTubeStreamResolver.shared.resolveAudioCdnUrl(videoId: track.id)
+            }
+            
+            if resolvedUrlStr == nil {
+                resolvedUrlStr = await YouTubeStreamResolver.shared.resolveTrackStream(
+                    title: track.title,
+                    artist: track.artist,
+                    durationSeconds: track.durationSeconds
+                )
+            }
+            
+            if let finalUrlStr = resolvedUrlStr, let resolvedUrl = URL(string: finalUrlStr) {
                 var updatedTrack = track
-                updatedTrack.streamUrl = resolvedUrlStr
+                updatedTrack.streamUrl = finalUrlStr
                 await MainActor.run {
                     self.currentTrack = updatedTrack
                     self.setupPlayer(url: resolvedUrl, track: updatedTrack)

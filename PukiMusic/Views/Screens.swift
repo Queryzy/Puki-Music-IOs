@@ -259,11 +259,21 @@ struct HomeDashboardView: View {
                     .lineLimit(1)
                     .frame(width: 140, alignment: .leading)
                 
-                Text(dTrack.artistName)
-                    .font(.system(size: 11))
-                    .foregroundColor(.pukiTextSecondary)
-                    .lineLimit(1)
-                    .frame(width: 140, alignment: .leading)
+                HStack(spacing: 4) {
+                    Text(dTrack.artistName)
+                        .font(.system(size: 11))
+                        .foregroundColor(.pukiTextSecondary)
+                        .lineLimit(1)
+                    
+                    Text("💿 HD")
+                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                        .foregroundColor(.pukiTeal)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(Color.pukiTeal.opacity(0.15))
+                        .cornerRadius(2)
+                }
+                .frame(width: 140, alignment: .leading)
             }
         }
     }
@@ -297,7 +307,7 @@ struct HomeDashboardView: View {
 // MARK: - Search Tab
 struct SearchTabView: View {
     @State private var query = ""
-    @State private var trackResults: [DeezerTrack] = []
+    @State private var trackResults: [Track] = []
     @State private var albumResults: [DeezerAlbum] = []
     @State private var selectedFilter: Int = 0 // 0: Semua, 1: Lagu, 2: Album
     @State private var isSearching = false
@@ -497,20 +507,12 @@ struct SearchTabView: View {
                                 }
                                 .padding(.horizontal, 20)
                                 
-                                ForEach(trackResults) { dTrack in
+                                ForEach(trackResults) { track in
                                     Button(action: {
-                                        let track = Track(
-                                            id: "\(dTrack.id)",
-                                            title: dTrack.title,
-                                            artist: dTrack.artistName,
-                                            durationSeconds: dTrack.durationSeconds,
-                                            thumbnailUrl: dTrack.highResCoverUrl,
-                                            streamUrl: dTrack.previewUrl
-                                        )
                                         playerManager.play(track: track)
                                     }) {
                                         HStack(spacing: 12) {
-                                            AsyncImage(url: URL(string: dTrack.highResCoverUrl)) { img in
+                                            AsyncImage(url: URL(string: track.highResThumbnailUrl)) { img in
                                                 img.resizable().scaledToFill()
                                             } placeholder: {
                                                 Color.pukiCardElevated
@@ -519,35 +521,47 @@ struct SearchTabView: View {
                                             .cornerRadius(8)
                                             
                                             VStack(alignment: .leading, spacing: 3) {
-                                                Text(dTrack.title)
+                                                Text(track.title)
                                                     .font(.system(size: 14, weight: .semibold))
                                                     .foregroundColor(.white)
                                                     .lineLimit(1)
                                                 
-                                                Text("\(dTrack.artistName) • \(dTrack.albumTitle)")
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(.pukiTextSecondary)
-                                                    .lineLimit(1)
+                                                HStack(spacing: 6) {
+                                                    Text(track.artist)
+                                                        .font(.system(size: 12))
+                                                        .foregroundColor(.pukiTextSecondary)
+                                                        .lineLimit(1)
+                                                    
+                                                    // Badge 1:1 Android (OFFICIAL • HD / POPULER)
+                                                    if track.id.hasPrefix("dz_") {
+                                                        Text("💿 OFFICIAL • HD")
+                                                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                            .foregroundColor(.pukiTeal)
+                                                            .padding(.horizontal, 4)
+                                                            .padding(.vertical, 1)
+                                                            .background(Color.pukiTeal.opacity(0.15))
+                                                            .cornerRadius(3)
+                                                    } else if track.viewCount > 100_000 {
+                                                        Text("🔥 POPULER")
+                                                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                            .foregroundColor(.pukiAmber)
+                                                            .padding(.horizontal, 4)
+                                                            .padding(.vertical, 1)
+                                                            .background(Color.pukiAmber.opacity(0.15))
+                                                            .cornerRadius(3)
+                                                    }
+                                                }
                                             }
                                             Spacer()
                                             
                                             // Quick Action: Real Background Download (1:1 Android)
-                                            let tid = "\(dTrack.id)"
                                             DownloadProgressButton(
-                                                trackId: tid,
+                                                trackId: track.id,
                                                 onDownload: {
-                                                    let t = Track(
-                                                        id: tid,
-                                                        title: dTrack.title,
-                                                        artist: dTrack.artistName,
-                                                        durationSeconds: dTrack.durationSeconds,
-                                                        thumbnailUrl: dTrack.highResCoverUrl,
-                                                        streamUrl: dTrack.previewUrl
-                                                    )
-                                                    DownloadService.shared.downloadTrack(track: t)
+                                                    DownloadService.shared.downloadTrack(track: track)
                                                 },
                                                 onDelete: {
-                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
+                                                    DownloadService.shared.deleteDownloadedTrack(trackId: track.id)
                                                 }
                                             )
                                             .padding(.trailing, 4)
@@ -581,15 +595,55 @@ struct SearchTabView: View {
         
         isSearching = true
         Task {
-            async let tracksReq = DeezerService.shared.searchTracks(query: q)
+            // Dual Search paralel (1:1 Android): Deezer API + YouTube Direct Search
+            async let dzReq = DeezerService.shared.searchTracks(query: q)
+            async let ytReq = YouTubeStreamResolver.shared.searchYouTubeTracks(query: q)
             async let albumsReq = DeezerService.shared.searchAlbums(query: q)
             
-            let tracks = (try? await tracksReq) ?? []
+            let dzTracks = (try? await dzReq) ?? []
+            let ytTracks = await ytReq
             let albums = (try? await albumsReq) ?? []
             
+            // Map Deezer ke domain Track
+            let mappedDzTracks: [Track] = dzTracks.map { dz in
+                Track(
+                    id: "dz_\(dz.id)",
+                    title: dz.title,
+                    artist: dz.artistName,
+                    durationSeconds: dz.durationSeconds,
+                    thumbnailUrl: dz.highResCoverUrl,
+                    streamUrl: dz.previewUrl,
+                    viewCount: 0,
+                    likeCount: 0
+                )
+            }
+            
+            // Gabungkan hasil: jika query bernuansa lokal Indonesia (misal Noah, Peterpan) atau hasil YT lebih banyak, taruh YT di atas / interleaved
+            var mergedTracks: [Track] = []
+            if !ytTracks.isEmpty {
+                // Interleave cerdas: YouTube (lokal akurat) & Deezer (Official HD)
+                var ytIdx = 0
+                var dzIdx = 0
+                while ytIdx < ytTracks.count || dzIdx < mappedDzTracks.count {
+                    if ytIdx < ytTracks.count {
+                        mergedTracks.append(ytTracks[ytIdx])
+                        ytIdx += 1
+                    }
+                    if dzIdx < mappedDzTracks.count {
+                        mergedTracks.append(mappedDzTracks[dzIdx])
+                        dzIdx += 1
+                    }
+                }
+            } else {
+                mergedTracks = mappedDzTracks
+            }
+            
+            let finalTracks = mergedTracks
+            let finalAlbums = albums
+            
             await MainActor.run {
-                self.trackResults = tracks
-                self.albumResults = albums
+                self.trackResults = finalTracks
+                self.albumResults = finalAlbums
                 self.isSearching = false
             }
         }
@@ -784,10 +838,20 @@ struct AlbumDetailSheetView: View {
                                                     .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .white)
                                                     .lineLimit(1)
                                                 
-                                                Text(t.artistName)
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(.pukiTextSecondary)
-                                                    .lineLimit(1)
+                                                HStack(spacing: 6) {
+                                                    Text(t.artistName)
+                                                        .font(.system(size: 12))
+                                                        .foregroundColor(.pukiTextSecondary)
+                                                        .lineLimit(1)
+                                                    
+                                                    Text("💿 OFFICIAL • HD")
+                                                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                        .foregroundColor(.pukiTeal)
+                                                        .padding(.horizontal, 4)
+                                                        .padding(.vertical, 1)
+                                                        .background(Color.pukiTeal.opacity(0.15))
+                                                        .cornerRadius(3)
+                                                }
                                             }
                                             
                                             Spacer()
@@ -1043,6 +1107,24 @@ struct LibraryTabView: View {
                             .foregroundColor(.pukiTextSecondary)
                             .lineLimit(1)
                         
+                        if track.id.hasPrefix("dz_") {
+                            Text("💿 OFFICIAL • HD")
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundColor(.pukiTeal)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.pukiTeal.opacity(0.15))
+                                .cornerRadius(3)
+                        } else if track.viewCount > 100_000 {
+                            Text("🔥 POPULER")
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundColor(.pukiAmber)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.pukiAmber.opacity(0.15))
+                                .cornerRadius(3)
+                        }
+                        
                         if downloadService.isTrackOffline(trackId: track.id) {
                             Text("OFFLINE")
                                 .font(.system(size: 8, weight: .bold, design: .monospaced))
@@ -1205,19 +1287,51 @@ struct PlaylistDetailSheetView: View {
                                     playerManager.play(track: t, fromQueue: playlist.tracks)
                                 }) {
                                     HStack(spacing: 12) {
-                                        Text(String(format: "%02d", idx + 1))
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .foregroundColor(.pukiTextSecondary)
-                                            .frame(width: 20)
+                                        if !t.thumbnailUrl.isEmpty {
+                                            AsyncImage(url: URL(string: t.highResThumbnailUrl)) { img in
+                                                img.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Color.pukiCardElevated
+                                            }
+                                            .frame(width: 44, height: 44)
+                                            .cornerRadius(6)
+                                        } else {
+                                            Text(String(format: "%02d", idx + 1))
+                                                .font(.system(size: 12, design: .monospaced))
+                                                .foregroundColor(.pukiTextSecondary)
+                                                .frame(width: 24)
+                                        }
                                         
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(t.title)
                                                 .font(.system(size: 14, weight: .semibold))
                                                 .foregroundColor(.white)
                                                 .lineLimit(1)
-                                            Text(t.artist)
-                                                .font(.system(size: 12))
-                                                .foregroundColor(.pukiTextSecondary)
+                                            
+                                            HStack(spacing: 6) {
+                                                Text(t.artist)
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.pukiTextSecondary)
+                                                    .lineLimit(1)
+                                                
+                                                if t.id.hasPrefix("dz_") {
+                                                    Text("💿 OFFICIAL • HD")
+                                                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                        .foregroundColor(.pukiTeal)
+                                                        .padding(.horizontal, 4)
+                                                        .padding(.vertical, 1)
+                                                        .background(Color.pukiTeal.opacity(0.15))
+                                                        .cornerRadius(3)
+                                                } else if t.viewCount > 100_000 {
+                                                    Text("🔥 POPULER")
+                                                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                        .foregroundColor(.pukiAmber)
+                                                        .padding(.horizontal, 4)
+                                                        .padding(.vertical, 1)
+                                                        .background(Color.pukiAmber.opacity(0.15))
+                                                        .cornerRadius(3)
+                                                }
+                                            }
                                         }
                                         Spacer()
                                         

@@ -59,6 +59,17 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         return nil
     }
     
+    /// Cek file cover lokal offline (.jpg) untuk playback tanpa koneksi internet (1:1 Android)
+    func getLocalCoverFileUrl(for trackId: String) -> URL? {
+        let jpgFile = getOfflineDirectory().appendingPathComponent("\(trackId).jpg")
+        if FileManager.default.fileExists(atPath: jpgFile.path),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: jpgFile.path),
+           let size = attrs[.size] as? Int64, size > 500 {
+            return jpgFile
+        }
+        return nil
+    }
+    
     func isTrackOffline(trackId: String) -> Bool {
         return downloadedTrackIds.contains(trackId) && getLocalAudioFileUrl(for: trackId) != nil
     }
@@ -145,8 +156,10 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     func deleteDownloadedTrack(trackId: String) {
         let m4aFile = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
         let mp3File = getOfflineDirectory().appendingPathComponent("\(trackId).mp3")
+        let jpgFile = getOfflineDirectory().appendingPathComponent("\(trackId).jpg")
         try? FileManager.default.removeItem(at: m4aFile)
         try? FileManager.default.removeItem(at: mp3File)
+        try? FileManager.default.removeItem(at: jpgFile)
         DispatchQueue.main.async {
             self.downloadedTrackIds.remove(trackId)
             self.downloadedTracks.removeAll(where: { $0.id == trackId })
@@ -213,6 +226,22 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         
         do {
             try FileManager.default.moveItem(at: location, to: dest)
+            
+            // Simpan Cover Image Secara Fisik ke Offline Directory (.jpg) agar 100% offline ready (1:1 Android)
+            let metaTrack = self.trackMetaPending[tid]
+            let thumbUrlStr = metaTrack?.highResThumbnailUrl ?? ""
+            if let thumbUrl = URL(string: thumbUrlStr), thumbUrl.scheme == "http" || thumbUrl.scheme == "https" {
+                Task {
+                    let coverDest = self.getOfflineDirectory().appendingPathComponent("\(tid).jpg")
+                    if !FileManager.default.fileExists(atPath: coverDest.path) {
+                        if let (imgData, imgResp) = try? await self.downloadSession.data(from: thumbUrl),
+                           let httpImg = imgResp as? HTTPURLResponse, httpImg.statusCode == 200, imgData.count > 500 {
+                            try? imgData.write(to: coverDest)
+                        }
+                    }
+                }
+            }
+            
             DispatchQueue.main.async {
                 self.downloadedTrackIds.insert(tid)
                 self.downloadingTrackIds.remove(tid)

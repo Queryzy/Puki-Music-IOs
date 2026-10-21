@@ -18,9 +18,19 @@ struct Track: Identifiable, Codable, Equatable {
     
     /// Auto-upscale low-res thumbnails to sharp 500x500 or hqdefault without 404 risk (1:1 Android)
     var highResThumbnailUrl: String {
-        var url = thumbnailUrl
+        // 0. Cek file cover lokal offline terlebih dahulu (100% offline, tanpa internet)
+        if let localCover = DownloadService.shared.getLocalCoverFileUrl(for: id) {
+            return localCover.absoluteString
+        }
         
-        // 1. Jika thumbnailUrl kosong, buat fallback langsung dari track ID
+        var url = thumbnailUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Bersihkan path lokal Android (/data/user/0/...) jika terbawa di thumbnail
+        if url.hasPrefix("/data/") || url.hasPrefix("file://") {
+            url = ""
+        }
+        
+        // 2. Jika thumbnailUrl kosong, buat fallback langsung dari track ID YouTube
         if url.isEmpty {
             if !id.hasPrefix("dz_") && id.count == 11 {
                 return "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"

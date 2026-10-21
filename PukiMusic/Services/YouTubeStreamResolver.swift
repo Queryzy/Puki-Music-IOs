@@ -29,22 +29,30 @@ class YouTubeStreamResolver {
         // 1. Cari video ID di YouTube Music via multi-query bertingkat (1:1 Android StreamResolver)
         var videoId = await searchBestYouTubeVideoId(title: title, artist: artist, durationSeconds: durationSeconds)
         
-        // 1b. Fallback: Jika search YouTube Music tidak menemukan ID, gunakan direct YouTube search
-        if videoId == nil {
-            let ytTracks = await searchYouTubeTracks(query: "\(artist) \(title)")
-            if let first = ytTracks.first {
-                videoId = first.id
+        // Coba resolve CDN dari videoId hasil search bertingkat
+        if let vid = videoId, let cdnUrl = await resolveAudioCdnUrl(videoId: vid) {
+            saveVideoIdCache(key: cacheKey, videoId: vid)
+            return cdnUrl
+        }
+        
+        // 1b. Fallback: Jika search YouTube Music gagal atau cipher terblokir, cari alternatif via direct YouTube search (Official Audio / Topic)
+        let fallbackQueries = [
+            "\(cleanStr(artist)) \(cleanStr(title)) Topic",
+            "\(cleanStr(artist)) \(cleanStr(title)) Audio",
+            "\(cleanStr(artist)) \(cleanStr(title))"
+        ]
+        
+        for q in fallbackQueries {
+            let ytTracks = await searchYouTubeTracks(query: q)
+            for track in ytTracks {
+                if let cdn = await resolveAudioCdnUrl(videoId: track.id) {
+                    saveVideoIdCache(key: cacheKey, videoId: track.id)
+                    return cdn
+                }
             }
         }
         
-        guard let resolvedVid = videoId else {
-            return nil
-        }
-        
-        saveVideoIdCache(key: cacheKey, videoId: resolvedVid)
-        
-        // 2. Resolve direct CDN audio streaming URL via YouTube Android InnerTube
-        return await resolveAudioCdnUrl(videoId: resolvedVid)
+        return nil
     }
     
     /// Cari YouTube Video ID paling pas via YouTube Music InnerTube search bertingkat

@@ -390,6 +390,18 @@ class LocalMusicStore: ObservableObject {
         var importedFavs = 0
         var importedPls = 0
         
+        func sanitizeThumb(id: String, thumb: String) -> String {
+            let t = thumb.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("http://") || t.hasPrefix("https://") {
+                return t
+            }
+            // Jika thumb berisi path lokal Android (/data/...) atau kosong, buat URL publik resmi
+            if id.count == 11 && !id.hasPrefix("dz_") {
+                return "https://i.ytimg.com/vi/\(id)/hqdefault.jpg"
+            }
+            return ""
+        }
+        
         // 1. Parse Favorites dari file Android
         if let favArr = json["favorites"] as? [[String: Any]] {
             for item in favArr {
@@ -397,10 +409,15 @@ class LocalMusicStore: ObservableObject {
                    let title = item["title"] as? String,
                    let artist = item["artist"] as? String {
                     let duration = item["duration"] as? Int64 ?? (item["duration"] as? Int).map({ Int64($0) }) ?? 0
-                    let thumb = item["thumbnailUrl"] as? String ?? ""
+                    let rawThumb = item["thumbnailUrl"] as? String ?? ""
+                    let cleanThumb = sanitizeThumb(id: id, thumb: rawThumb)
+                    let vCount = item["viewCount"] as? Int64 ?? 0
+                    let lCount = item["likeCount"] as? Int64 ?? 0
                     
-                    let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
-                    if !favorites.contains(where: { $0.id == track.id }) {
+                    let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: cleanThumb, viewCount: vCount, likeCount: lCount)
+                    if let idx = favorites.firstIndex(where: { $0.id == track.id }) {
+                        favorites[idx] = track // Timpa dengan data baru
+                    } else {
                         favorites.append(track)
                         importedFavs += 1
                     }
@@ -409,7 +426,7 @@ class LocalMusicStore: ObservableObject {
             saveFavorites()
         }
         
-        // 2. Parse Playlists dari file Android
+        // 2. Parse Playlists dari file Android (Update / Overwrite jika nama playlist sudah ada)
         if let plArr = json["playlists"] as? [[String: Any]] {
             for plItem in plArr {
                 let plId = plItem["id"] as? String ?? UUID().uuidString
@@ -422,14 +439,21 @@ class LocalMusicStore: ObservableObject {
                            let title = t["title"] as? String,
                            let artist = t["artist"] as? String {
                             let duration = t["duration"] as? Int64 ?? 0
-                            let thumb = t["thumbnailUrl"] as? String ?? ""
-                            tracks.append(Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb))
+                            let rawThumb = t["thumbnailUrl"] as? String ?? ""
+                            let cleanThumb = sanitizeThumb(id: id, thumb: rawThumb)
+                            let vCount = t["viewCount"] as? Int64 ?? 0
+                            let lCount = t["likeCount"] as? Int64 ?? 0
+                            tracks.append(Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: cleanThumb, viewCount: vCount, likeCount: lCount))
                         }
                     }
                 }
                 
                 let playlist = Playlist(id: plId, name: plName, tracks: tracks)
-                if !playlists.contains(where: { $0.name == playlist.name }) {
+                if let idx = playlists.firstIndex(where: { $0.name.caseInsensitiveCompare(playlist.name) == .orderedSame || $0.id == playlist.id }) {
+                    // Update / Overwrite playlist yang sudah ada agar data lagu & cover langsung fresh
+                    playlists[idx] = playlist
+                    importedPls += 1
+                } else {
                     playlists.append(playlist)
                     importedPls += 1
                 }

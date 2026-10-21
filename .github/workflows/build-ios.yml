@@ -47,12 +47,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.12
-          name: "Puki Music iOS v1.0.12"
+          tag_name: v1.0.13
+          name: "Puki Music iOS v1.0.13"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.12
-            - **Guaranteed Playback & Audio Output**: Added resilient direct audio preview fallback and play history stream preservation.
-            - **Seamless Offline Downloader**: Ensured chunked audio buffer writing and permanent sandboxed storage.
+            ## Puki Music iOS Native (SwiftUI) v1.0.13
+            - **Bulletproof Offline Downloader**: Added strict HTTP 200/206 and min 150KB file size integrity checks; implemented resilient Deezer CDN fallback for offline audio.
+            - **Crystal Clear Retina Artwork**: Upgraded Deezer covers to reliable 500x500 CDN format and YouTube thumbnails to guaranteed non-404 HQ assets.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

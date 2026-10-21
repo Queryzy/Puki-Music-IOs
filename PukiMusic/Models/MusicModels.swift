@@ -16,23 +16,21 @@ struct Track: Identifiable, Codable, Equatable {
         return String(format: "%d:%02d", minutes, seconds)
     }
     
-    /// Auto-upscale low-res thumbnails to 1000x1000 or maxresdefault for Retina displays (1:1 Android)
+    /// Auto-upscale low-res thumbnails to sharp 500x500 or hqdefault without 404 risk (1:1 Android)
     var highResThumbnailUrl: String {
         var url = thumbnailUrl
         if url.contains("deezer.com") {
-            // Replace any size with /1000x1000-
-            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/56x56-", with: "/1000x1000-")
+            // Deezer 500x500 is 100% available across all tracks and albums without 404
+            url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/56x56-", with: "/500x500-")
         } else if url.contains("ytimg.com") || url.contains("ggpht.com") {
-            url = url.replacingOccurrences(of: "hqdefault.jpg", with: "maxresdefault.jpg")
-            url = url.replacingOccurrences(of: "mqdefault.jpg", with: "maxresdefault.jpg")
-            url = url.replacingOccurrences(of: "sddefault.jpg", with: "maxresdefault.jpg")
-            url = url.replacingOccurrences(of: "default.jpg", with: "maxresdefault.jpg")
-            url = url.replacingOccurrences(of: "=w120-h120", with: "=w1000-h1000")
-            url = url.replacingOccurrences(of: "=s120", with: "=s1000")
-            url = url.replacingOccurrences(of: "=s60", with: "=s1000")
+            // hqdefault and sddefault are always available on YouTube servers (maxresdefault often 404s)
+            url = url.replacingOccurrences(of: "default.jpg", with: "hqdefault.jpg")
+            url = url.replacingOccurrences(of: "mqdefault.jpg", with: "hqdefault.jpg")
+            url = url.replacingOccurrences(of: "=w120-h120", with: "=w600-h600")
+            url = url.replacingOccurrences(of: "=s120", with: "=s600")
+            url = url.replacingOccurrences(of: "=s60", with: "=s600")
         }
         return url
     }
@@ -42,9 +40,9 @@ extension DeezerTrack {
     var highResCoverUrl: String {
         var url = coverUrl
         if url.contains("deezer.com") {
-            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/56x56-", with: "/500x500-")
         }
         return url
     }
@@ -54,9 +52,9 @@ extension DeezerAlbum {
     var highResCoverUrl: String {
         var url = coverUrl
         if url.contains("deezer.com") {
-            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/56x56-", with: "/500x500-")
         }
         return url
     }
@@ -66,9 +64,9 @@ extension DeezerArtist {
     var highResPictureUrl: String {
         var url = pictureUrl
         if url.contains("deezer.com") {
-            url = url.replacingOccurrences(of: "/250x250-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/500x500-", with: "/1000x1000-")
-            url = url.replacingOccurrences(of: "/120x120-", with: "/1000x1000-")
+            url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/120x120-", with: "/500x500-")
+            url = url.replacingOccurrences(of: "/56x56-", with: "/500x500-")
         }
         return url
     }

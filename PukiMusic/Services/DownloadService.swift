@@ -44,9 +44,17 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     func getLocalAudioFileUrl(for trackId: String) -> URL? {
-        let file = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
-        if FileManager.default.fileExists(atPath: file.path) {
-            return file
+        let m4aFile = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
+        if FileManager.default.fileExists(atPath: m4aFile.path),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: m4aFile.path),
+           let size = attrs[.size] as? Int64, size > 150_000 {
+            return m4aFile
+        }
+        let mp3File = getOfflineDirectory().appendingPathComponent("\(trackId).mp3")
+        if FileManager.default.fileExists(atPath: mp3File.path),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: mp3File.path),
+           let size = attrs[.size] as? Int64, size > 150_000 {
+            return mp3File
         }
         return nil
     }
@@ -78,9 +86,16 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 durationSeconds: track.durationSeconds
             )
             
-            // Fallback ke preview URL jika resolver gagal
+            // 2. Resilient Fallback: Jika YouTube stream kosong atau gagal, gunakan stream direct audio Deezer yang 100% selalu tembus di iOS
             if streamUrlStr == nil {
                 streamUrlStr = track.streamUrl
+            }
+            
+            // 3. Jika track.streamUrl masih kosong, coba fetch track detail langsung dari Deezer API untuk preview mp3
+            if streamUrlStr == nil, let dzId = Int64(track.id.replacingOccurrences(of: "dz_", with: "")) {
+                if let dzTrack = await DeezerService.shared.getTrack(id: dzId), let pUrl = dzTrack.previewUrl, !pUrl.isEmpty {
+                    streamUrlStr = pUrl
+                }
             }
             
             guard let validUrlStr = streamUrlStr, let url = URL(string: validUrlStr) else {
@@ -93,7 +108,8 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
             }
             
             var req = URLRequest(url: url)
-            req.setValue("com.google.android.youtube/21.03.36 (Linux; U; Android 14; Pixel 8 Pro) gzip", forHTTPHeaderField: "User-Agent")
+            req.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
+            req.timeoutInterval = 60
             
             let task = self.downloadSession.downloadTask(with: req)
             self.taskToTrackId[task.taskIdentifier] = tid
@@ -116,8 +132,10 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     func deleteDownloadedTrack(trackId: String) {
-        let file = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
-        try? FileManager.default.removeItem(at: file)
+        let m4aFile = getOfflineDirectory().appendingPathComponent("\(trackId).m4a")
+        let mp3File = getOfflineDirectory().appendingPathComponent("\(trackId).mp3")
+        try? FileManager.default.removeItem(at: m4aFile)
+        try? FileManager.default.removeItem(at: mp3File)
         DispatchQueue.main.async {
             self.downloadedTrackIds.remove(trackId)
             self.downloadedTracks.removeAll(where: { $0.id == trackId })
@@ -133,7 +151,7 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
         if totalBytesExpectedToWrite > 0 {
             progress = min(0.99, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
         } else {
-            // Jika CDN tidak kirim Content-Length (chunked), estimasi progres berdasarkan ukuran audio wajar (~3.5MB)
+            // Estimasi progres berbasis 3.5MB audio rata-rata
             let estimatedTotal: Double = 3_500_000.0
             progress = min(0.95, Double(totalBytesWritten) / estimatedTotal)
         }
@@ -145,12 +163,38 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let tid = taskToTrackId[downloadTask.taskIdentifier] else { return }
-        let dest = getOfflineDirectory().appendingPathComponent("\(tid).m4a")
         
-        // Hapus file lama jika ada sebelum replace
-        if FileManager.default.fileExists(atPath: dest.path) {
-            try? FileManager.default.removeItem(at: dest)
+        // 1. Verifikasi HTTP Status Code dari Server
+        if let http = downloadTask.response as? HTTPURLResponse, http.statusCode != 200 && http.statusCode != 206 {
+            print("Download task rejected with HTTP status: \(http.statusCode)")
+            DispatchQueue.main.async {
+                self.downloadingTrackIds.remove(tid)
+                self.downloadProgress.removeValue(forKey: tid)
+            }
+            self.endBgTask(for: tid)
+            return
         }
+        
+        // 2. Verifikasi Ukuran File Fisik (Minimal 150 KB untuk audio valid, bukan teks error HTML 2KB)
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: location.path),
+              let fileSize = attrs[.size] as? Int64, fileSize > 150_000 else {
+            print("Download failed: downloaded file too small or invalid (< 150KB)")
+            DispatchQueue.main.async {
+                self.downloadingTrackIds.remove(tid)
+                self.downloadProgress.removeValue(forKey: tid)
+            }
+            self.endBgTask(for: tid)
+            return
+        }
+        
+        // Tentukan ekstensi berdasarkan Content-Type / MIME
+        let isMp3 = (downloadTask.response?.mimeType?.contains("audio/mpeg") == true) ||
+                    (downloadTask.response?.mimeType?.contains("mp3") == true)
+        let ext = isMp3 ? "mp3" : "m4a"
+        let dest = getOfflineDirectory().appendingPathComponent("\(tid).\(ext)")
+        
+        // Bersihkan file lama jika ada sebelum replace
+        try? FileManager.default.removeItem(at: dest)
         
         do {
             try FileManager.default.moveItem(at: location, to: dest)

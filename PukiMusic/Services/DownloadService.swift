@@ -128,7 +128,16 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     // MARK: - URLSessionDownloadDelegate
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let tid = taskToTrackId[downloadTask.taskIdentifier] else { return }
-        let progress = totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0.5
+        
+        let progress: Double
+        if totalBytesExpectedToWrite > 0 {
+            progress = min(0.99, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+        } else {
+            // Jika CDN tidak kirim Content-Length (chunked), estimasi progres berdasarkan ukuran audio wajar (~3.5MB)
+            let estimatedTotal: Double = 3_500_000.0
+            progress = min(0.95, Double(totalBytesWritten) / estimatedTotal)
+        }
+        
         DispatchQueue.main.async {
             self.downloadProgress[tid] = progress
         }
@@ -137,7 +146,12 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let tid = taskToTrackId[downloadTask.taskIdentifier] else { return }
         let dest = getOfflineDirectory().appendingPathComponent("\(tid).m4a")
-        try? FileManager.default.removeItem(at: dest)
+        
+        // Hapus file lama jika ada sebelum replace
+        if FileManager.default.fileExists(atPath: dest.path) {
+            try? FileManager.default.removeItem(at: dest)
+        }
+        
         do {
             try FileManager.default.moveItem(at: location, to: dest)
             DispatchQueue.main.async {
@@ -152,6 +166,7 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 self.saveManifest()
             }
         } catch {
+            print("Failed to move downloaded file to \(dest.path): \(error)")
             DispatchQueue.main.async {
                 self.downloadingTrackIds.remove(tid)
                 self.downloadProgress.removeValue(forKey: tid)

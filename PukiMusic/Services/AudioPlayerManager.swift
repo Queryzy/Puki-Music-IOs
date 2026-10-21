@@ -35,8 +35,7 @@ class AudioPlayerManager: ObservableObject {
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            // Set playback mode with allowBluetoothA2DP for high quality audio without ducking glitches
-            try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [.allowBluetoothA2DP])
+            try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
         } catch {
             print("Failed to activate AVAudioSession: \(error)")
@@ -166,20 +165,12 @@ class AudioPlayerManager: ObservableObject {
         
         let playerItem = AVPlayerItem(url: url)
         
-        // 1. Matikan audio spatialization dinamis iOS agar volume tidak pumping/berubah saat bergerak ([] = None / turn off spatialization)
-        playerItem.allowedAudioSpatializationFormats = []
-        // Kunci algoritma pitch/timestretch murni tanpa kompresi gain dinamis
-        playerItem.audioTimePitchAlgorithm = .spectral
+        // Pastikan AVAudioSession aktif sebelum playback dimulai
+        try? AVAudioSession.sharedInstance().setActive(true)
         
         let newPlayer = AVPlayer(playerItem: playerItem)
         newPlayer.automaticallyWaitsToMinimizeStalling = false
         newPlayer.volume = 1.0
-        
-        // KRUSIAL UNTUK iOS: itag 18 YouTube adalah format muxed MP4 (ada video track 360p + audio).
-        // Secara default Apple akan mem-pause AVPlayer saat user minimize app / swipe notification center
-        // KECUALI audiovisualBackgroundPlaybackPolicy diatur ke .continuesIfPossible!
-        newPlayer.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
-        newPlayer.preventsDisplaySleepDuringVideoPlayback = false
         
         player = newPlayer
         

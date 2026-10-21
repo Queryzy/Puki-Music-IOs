@@ -47,15 +47,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.10
-          name: "Puki Music iOS v1.0.10"
+          tag_name: v1.0.11
+          name: "Puki Music iOS v1.0.11"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.10
-            - **Audio Silence Fix**: Removed forced video track muting on itag 18 stream. Pure audio playback restored with zero loss and 100% stable CoreAudio volume.
-            - **Multi-Query Offline Downloader 1:1 Android**: Added 4-tier query fallback resolver with duration tolerance matching and cached Deezer-to-YouTube mapping.
-            - **Realtime Download Percentage Indicator**: Added animated progress rings with exact percentage number badge across all track rows, album sheets, and full player.
-            - **Synchronized Lyrics Engine 1:1**: Implemented multi-query LRCLIB matching, title cleaning, duration tolerance filtering, dynamic track-switch reloading, and tap-to-seek support.
-            - **Full Retina HD Artwork**: Upgraded Deezer covers and artist portraits to 1000x1000 (`cover_xl`, `picture_xl`) and YouTube thumbnails to `maxresdefault.jpg`.
+            ## Puki Music iOS Native (SwiftUI) v1.0.11
+            - **Definitive Audio & Background Fix**: Corrected AVAudioSession configuration to standard `.playback` without incompatible policy options on iOS 18.
+            - **Pure Audio Stream Resolution**: Switched to ANDROID_VR InnerTube client delivering pure AAC/m4a audio streams (itag 140 / 139) without video track constraints.
+            - **Resilient Offline Downloader**: Fixed chunked transfer percentage calculation and robust file transfer into the local container sandbox.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

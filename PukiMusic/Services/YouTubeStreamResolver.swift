@@ -119,7 +119,7 @@ class YouTubeStreamResolver {
         return res.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    /// Ambil direct stream URL audio m4a/mp4 durasi penuh langsung dari YouTube via Android InnerTube Client (itag 18)
+    /// Ambil direct stream URL pure audio m4a/opus langsung dari YouTube via ANDROID_VR InnerTube (itag 140 / 139 / 251)
     func resolveAudioCdnUrl(videoId: String) async -> String? {
         if let cached = streamCache[videoId], Date().timeIntervalSince(cached.timestamp) < 3600 {
             return cached.url
@@ -129,15 +129,28 @@ class YouTubeStreamResolver {
             return nil
         }
         
-        var req = URLRequest(url: playerUrl)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("com.google.android.youtube/21.03.36 (Linux; U; Android 14; Pixel 8 Pro) gzip", forHTTPHeaderField: "User-Agent")
-        req.setValue("3", forHTTPHeaderField: "X-YouTube-Client-Name")
-        req.setValue("21.03.36", forHTTPHeaderField: "X-YouTube-Client-Version")
-        req.timeoutInterval = 8
+        // 1. Coba ANDROID_VR Client untuk mendapatkan pure audio adaptive streams (itag 140 m4a / 251 webm)
+        let vrBody: [String: Any] = [
+            "context": [
+                "client": [
+                    "clientName": "ANDROID_VR",
+                    "clientVersion": "1.60.19",
+                    "hl": "en",
+                    "gl": "US"
+                ]
+            ],
+            "videoId": videoId,
+            "contentCheckOk": true,
+            "racyCheckOk": true
+        ]
         
-        let bodyJson: [String: Any] = [
+        if let directAudioUrl = await fetchDirectStream(url: playerUrl, body: vrBody, isPureAudioPreferred: true) {
+            streamCache[videoId] = (url: directAudioUrl, timestamp: Date())
+            return directAudioUrl
+        }
+        
+        // 2. Fallback ke ANDROID client standard (itag 18) jika VR client gagal
+        let androidBody: [String: Any] = [
             "context": [
                 "client": [
                     "clientName": "ANDROID",
@@ -152,7 +165,22 @@ class YouTubeStreamResolver {
             "racyCheckOk": true
         ]
         
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: bodyJson) else { return nil }
+        if let fallbackUrl = await fetchDirectStream(url: playerUrl, body: androidBody, isPureAudioPreferred: false) {
+            streamCache[videoId] = (url: fallbackUrl, timestamp: Date())
+            return fallbackUrl
+        }
+        
+        return nil
+    }
+    
+    private func fetchDirectStream(url: URL, body: [String: Any], isPureAudioPreferred: Bool) async -> String? {
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 8
+        
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         req.httpBody = httpBody
         
         do {
@@ -163,22 +191,27 @@ class YouTubeStreamResolver {
                 return nil
             }
             
-            // 1. Cek formats (itag 18 adalah 360p muxed mp4 audio+video langsung tanpa cipher)
-            if let formats = streamingData["formats"] as? [[String: Any]] {
-                for f in formats {
-                    if let itag = f["itag"] as? Int, itag == 18, let url = f["url"] as? String {
-                        streamCache[videoId] = (url: url, timestamp: Date())
-                        return url
+            // Prioritas 1: Pure audio m4a (itag 140 / 139) - 100% native supported by AVPlayer tanpa video container
+            if let adaptive = streamingData["adaptiveFormats"] as? [[String: Any]] {
+                // Cari m4a itag 140 dulu (128kbps AAC)
+                for f in adaptive {
+                    if let itag = f["itag"] as? Int, itag == 140, let streamUrl = f["url"] as? String {
+                        return streamUrl
+                    }
+                }
+                // Cari any audio/mp4 m4a
+                for f in adaptive {
+                    if let mime = f["mimeType"] as? String, mime.contains("audio/mp4"), let streamUrl = f["url"] as? String {
+                        return streamUrl
                     }
                 }
             }
             
-            // 2. Cek adaptiveFormats audio jika ada direct url
-            if let adaptive = streamingData["adaptiveFormats"] as? [[String: Any]] {
-                for f in adaptive {
-                    if let mime = f["mimeType"] as? String, mime.contains("audio"), let url = f["url"] as? String {
-                        streamCache[videoId] = (url: url, timestamp: Date())
-                        return url
+            // Prioritas 2: itag 18 (muxed 360p mp4)
+            if let formats = streamingData["formats"] as? [[String: Any]] {
+                for f in formats {
+                    if let itag = f["itag"] as? Int, itag == 18, let streamUrl = f["url"] as? String {
+                        return streamUrl
                     }
                 }
             }

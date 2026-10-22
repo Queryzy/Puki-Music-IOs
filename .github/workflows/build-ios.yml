@@ -31,17 +31,27 @@ jobs:
 
       - name: Build IPA (Ad-Hoc / Unsigned for SideStore & Sideloadly)
         run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          BUILD="${{ steps.get_version.outputs.build }}"
+          
           xcodebuild clean archive \
             -project PukiMusic.xcodeproj \
             -scheme PukiMusic \
             -configuration Release \
             -archivePath build/PukiMusic.xcarchive \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${BUILD}" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
           mkdir -p build/Payload
           cp -r build/PukiMusic.xcarchive/Products/Applications/PukiMusic.app build/Payload/
+          
+          # Force Plist to exact target version so SideStore parser matches 100%
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" build/Payload/PukiMusic.app/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${VERSION}" build/Payload/PukiMusic.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" build/Payload/PukiMusic.app/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD}" build/Payload/PukiMusic.app/Info.plist
+          
           cd build && zip -r Puki-Music.ipa Payload
           echo "IPA Build complete: build/Puki-Music.ipa"
 

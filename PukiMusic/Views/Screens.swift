@@ -1589,11 +1589,34 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.27 Card
+                        releaseCard(
+                            version: "v1.0.27 (Build 27)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Sinkronisasi Changelog Dinamis: Changelog kini selalu selaras dengan versi aktif aplikasi.",
+                                "Automated SHA-256 Pipeline: Verifikasi kriptografis otomatis pada setiap rilis SideStore repository."
+                            ]
+                        )
+                        
+                        // v1.0.26 Card
+                        releaseCard(
+                            version: "v1.0.26 (Build 26)",
+                            date: "Oktober 2026",
+                            badge: "AUTO UPDATE",
+                            changes: [
+                                "SideStore Community Source: Dukungan pembaruan 1-klik langsung dari SideStore tab My Apps.",
+                                "Integrasi Ekosistem: Tombol pintasan tambah repository SideStore langsung di tab Pengaturan.",
+                                "Enforce Version Plist: Memaksa versioning biner konsisten pada seluruh layer iOS."
+                            ]
+                        )
+                        
                         // v1.0.25 Card
                         releaseCard(
                             version: "v1.0.25 (Build 25)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "VERSIONING",
                             changes: [
                                 "Versi Dinamis: Pengaturan menampilkan versi & build riil dari bundle aplikasi.",
                                 "Akses Rilis Langsung: Tombol Pintasan ke GitHub Releases untuk update IPA via SideStore.",

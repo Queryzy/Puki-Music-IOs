@@ -18,15 +18,15 @@
       "category": "music",
       "version": "1.0.26",
       "versionDate": "2026-10-22T08:52:37.649206+00:00",
-      "versionDescription": "• SideStore Community Source Integration\n• Dynamic App Versioning\n• LRC Timing Offset Sync Adjuster Stepper\n• O(1) Performance Optimization\n• High-Res Artwork & Offline Cover Caching",
+      "versionDescription": "\u2022 SideStore Community Source Integration\n\u2022 Dynamic App Versioning\n\u2022 LRC Timing Offset Sync Adjuster Stepper\n\u2022 O(1) Performance Optimization\n\u2022 High-Res Artwork & Offline Cover Caching",
       "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.26/Puki-Music.ipa",
       "size": 1571205,
       "screenshotURLs": [],
       "versions": [
         {
           "version": "1.0.26",
-          "date": "2026-10-22T08:52:37.649206+00:00",
-          "localizedDescription": "• SideStore Community Source Integration\n• Dynamic App Versioning\n• LRC Timing Offset Sync Adjuster Stepper\n• O(1) Performance Optimization\n• High-Res Artwork & Offline Cover Caching",
+          "date": "2026-10-22T08:58:45.894747+00:00",
+          "localizedDescription": "\u2022 SideStore Community Source Integration\n\u2022 Dynamic App Versioning\n\u2022 LRC Timing Offset Sync Adjuster Stepper\n\u2022 O(1) Performance Optimization\n\u2022 High-Res Artwork & Offline Cover Caching",
           "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.26/Puki-Music.ipa",
           "size": 1571205,
           "minOSVersion": "16.0"

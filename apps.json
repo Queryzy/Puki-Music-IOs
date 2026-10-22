@@ -25,11 +25,11 @@
       "versions": [
         {
           "version": "1.0.26",
-          "date": "2026-10-22T08:47:16.460981+00:00",
+          "date": "2026-10-22T08:52:37.649206+00:00",
           "localizedDescription": "\u2022 SideStore Community Source Integration\n\u2022 Dynamic App Versioning\n\u2022 LRC Timing Offset Sync Adjuster Stepper\n\u2022 O(1) Performance Optimization\n\u2022 High-Res Artwork & Offline Cover Caching",
           "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.26/Puki-Music.ipa",
-          "size": 1571277,
-          "sha256": "43677e8ce6cd91a7b5d68ba67dc5e2e561dac15564175dbef6226e59b8ce2ff9",
+          "size": 1571205,
+          "sha256": "9c1ed302dd97ddfbfc955349cdfea7cd04ed0087f6adc028769c5bb1987e11cf",
           "minOSVersion": "16.0"
         }
       ]

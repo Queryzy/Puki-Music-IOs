@@ -26,6 +26,7 @@ class AudioPlayerManager: ObservableObject {
     private var player: AVPlayer?
     private var timeObserverToken: Any?
     private var statusObserver: NSKeyValueObservation?
+    private var lastNowPlayingUpdate: Double = 0
     
     init() {
         setupAudioSession()
@@ -190,7 +191,11 @@ class AudioPlayerManager: ObservableObject {
         timeObserverToken = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self = self else { return }
             self.currentTime = time.seconds
-            self.updateNowPlayingPlaybackInfo()
+            // Optimasi performa: MPNowPlayingInfoCenter cukup diupdate tiap detik (iOS auto-extrapolates scrubber)
+            if abs(time.seconds - self.lastNowPlayingUpdate) >= 1.0 {
+                self.lastNowPlayingUpdate = time.seconds
+                self.updateNowPlayingPlaybackInfo()
+            }
         }
         
         // Observe status

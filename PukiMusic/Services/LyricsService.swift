@@ -205,4 +205,17 @@ class LyricsService {
         }
         return res.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    
+    // MARK: - Lyrics Timing Sync Offset Persistence
+    func getOffset(for trackId: String) -> Double {
+        UserDefaults.standard.double(forKey: "lrc_offset_\(trackId)")
+    }
+    
+    func setOffset(_ offset: Double, for trackId: String) {
+        if abs(offset) < 0.05 {
+            UserDefaults.standard.removeObject(forKey: "lrc_offset_\(trackId)")
+        } else {
+            UserDefaults.standard.set(offset, forKey: "lrc_offset_\(trackId)")
+        }
+    }
 }

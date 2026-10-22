@@ -2101,14 +2101,68 @@ struct QueueListView: View {
 }
 
 // MARK: - Inline Lyrics Player View (Embedded inside Now Playing Screen)
+// MARK: - Lyric Sync Adjuster Component (1:1 Android Stepper)
+struct LyricSyncAdjusterBar: View {
+    @Binding var offset: Double
+    let onAdjust: (Double) -> Void
+    let onReset: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            stepperButton(title: "-0.5s", delta: -0.5)
+            stepperButton(title: "-0.1s", delta: -0.1)
+            
+            Button(action: onReset) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 9, weight: .bold))
+                    Text(abs(offset) > 0.01 ? String(format: "%+.1fs", offset) : "0.0s")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(abs(offset) > 0.01 ? .pukiAmber : .white.opacity(0.7))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.12))
+                .cornerRadius(8)
+            }
+            
+            stepperButton(title: "+0.1s", delta: +0.1)
+            stepperButton(title: "+0.5s", delta: +0.5)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.pukiCardElevated)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+    
+    private func stepperButton(title: String, delta: Double) -> some View {
+        Button(action: { onAdjust(delta) }) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(7)
+        }
+    }
+}
+
+// MARK: - Inline Synchronized Lyrics View (Inside FullScreenPlayer)
 struct InlineLyricsPlayerView: View {
     @EnvironmentObject var playerManager: AudioPlayerManager
     @State private var lyrics: LyricsResult?
     @State private var isLoading = true
     @State private var currentLineId: Int64? = nil
+    @State private var lyricOffset: Double = 0.0
+    @State private var showSyncControls: Bool = false
     
     var body: some View {
-        VStack {
+        VStack(spacing: 4) {
             if isLoading {
                 Spacer()
                 ProgressView().tint(.pukiCoral)
@@ -2119,17 +2173,61 @@ struct InlineLyricsPlayerView: View {
                 Spacer()
             } else if let lrc = lyrics {
                 if lrc.isSynced && !lrc.lines.isEmpty {
+                    // Quick bar header untuk tombol Sync Lirik
+                    HStack {
+                        Text("\(lrc.lines.count) Baris Lirik")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(.pukiTextSecondary.opacity(0.6))
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                showSyncControls.toggle()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "slider.horizontal.below.square.and.square")
+                                    .font(.system(size: 11, weight: .semibold))
+                                if abs(lyricOffset) > 0.01 {
+                                    Text(String(format: "%+.1fs", lyricOffset))
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                } else {
+                                    Text("Sync")
+                                        .font(.system(size: 10, weight: .medium))
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(abs(lyricOffset) > 0.01 ? Color.pukiAmber.opacity(0.25) : Color.white.opacity(0.08))
+                            .foregroundColor(abs(lyricOffset) > 0.01 ? .pukiAmber : .pukiTextSecondary)
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 2)
+                    
+                    if showSyncControls {
+                        LyricSyncAdjusterBar(
+                            offset: $lyricOffset,
+                            onAdjust: { delta in adjustOffset(delta) },
+                            onReset: { resetOffset() }
+                        )
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    }
+                    
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: false) {
-                            VStack(spacing: 22) {
+                            VStack(spacing: 20) {
                                 ForEach(lrc.lines) { line in
-                                    let isCurrent = isLineActive(line, allLines: lrc.lines)
+                                    let isCurrent = (line.id == currentLineId)
                                     Button(action: {
-                                        // Tap pada baris lirik untuk seek ke detik lagu (1:1 Android)
-                                        playerManager.seek(to: Double(line.timeMs) / 1000.0)
+                                        // Tap pada baris lirik untuk seek ke detik lagu presisi offset (1:1 Android)
+                                        let targetSec = (Double(line.timeMs) / 1000.0) + lyricOffset
+                                        playerManager.seek(to: max(0, targetSec))
                                     }) {
                                         Text(line.text)
-                                            .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
+                                            .font(.system(size: isCurrent ? 23 : 16, weight: isCurrent ? .bold : .medium))
                                             .foregroundColor(isCurrent ? .pukiAmber : .white.opacity(0.35))
                                             .multilineTextAlignment(.center)
                                             .scaleEffect(isCurrent ? 1.05 : 1.0)
@@ -2140,7 +2238,7 @@ struct InlineLyricsPlayerView: View {
                                 }
                             }
                             .padding(.horizontal, 24)
-                            .padding(.vertical, 30)
+                            .padding(.vertical, 20)
                         }
                         .onChange(of: playerManager.currentTime) { _ in
                             updateCurrentLine(lines: lrc.lines, proxy: proxy)
@@ -2185,50 +2283,75 @@ struct InlineLyricsPlayerView: View {
             self.isLoading = false
             return
         }
+        let savedOffset = LyricsService.shared.getOffset(for: track.id)
+        await MainActor.run {
+            self.lyricOffset = savedOffset
+        }
         self.isLoading = true
         let res = await LyricsService.shared.getLyrics(track: track)
         await MainActor.run {
             self.lyrics = res
             self.isLoading = false
             self.currentLineId = nil
-        }
-    }
-    
-    private func updateCurrentLine(lines: [LyricLine], proxy: ScrollViewProxy) {
-        let currentMs = Int64(playerManager.currentTime * 1000)
-        guard let active = lines.last(where: { currentMs >= $0.timeMs }) else { return }
-        if currentLineId != active.id {
-            currentLineId = active.id
-            withAnimation(.easeInOut(duration: 0.3)) {
-                proxy.scrollTo(active.id, anchor: .center)
+            if let lines = res?.lines {
+                let effMs = Int64((playerManager.currentTime - self.lyricOffset) * 1000)
+                if let active = lines.last(where: { effMs >= $0.timeMs }) {
+                    self.currentLineId = active.id
+                }
             }
         }
     }
     
-    private func isLineActive(_ line: LyricLine, allLines: [LyricLine]) -> Bool {
-        let currentMs = Int64(playerManager.currentTime * 1000)
-        guard currentMs >= line.timeMs else { return false }
-        if let idx = allLines.firstIndex(where: { $0.id == line.id }),
-           idx + 1 < allLines.count {
-            return currentMs < allLines[idx + 1].timeMs
+    private func adjustOffset(_ delta: Double) {
+        let newOffset = ((lyricOffset + delta) * 10).rounded() / 10
+        lyricOffset = newOffset
+        if let trackId = playerManager.currentTrack?.id {
+            LyricsService.shared.setOffset(newOffset, for: trackId)
         }
-        return true
+        let effMs = Int64((playerManager.currentTime - newOffset) * 1000)
+        if let active = lyrics?.lines.last(where: { effMs >= $0.timeMs }) {
+            currentLineId = active.id
+        }
+    }
+    
+    private func resetOffset() {
+        lyricOffset = 0.0
+        if let trackId = playerManager.currentTrack?.id {
+            LyricsService.shared.setOffset(0.0, for: trackId)
+        }
+        let effMs = Int64(playerManager.currentTime * 1000)
+        if let active = lyrics?.lines.last(where: { effMs >= $0.timeMs }) {
+            currentLineId = active.id
+        }
+    }
+    
+    private func updateCurrentLine(lines: [LyricLine], proxy: ScrollViewProxy) {
+        let effMs = Int64((playerManager.currentTime - lyricOffset) * 1000)
+        guard let active = lines.last(where: { effMs >= $0.timeMs }) else { return }
+        if currentLineId != active.id {
+            currentLineId = active.id
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(active.id, anchor: .center)
+            }
+        }
     }
 }
 
-// MARK: - Lyrics Sheet View
+// MARK: - Lyrics Sheet View (Modal from MiniPlayer)
 struct LyricsSheetView: View {
     @EnvironmentObject var playerManager: AudioPlayerManager
     @Environment(\.dismiss) var dismiss
     @State private var lyrics: LyricsResult?
     @State private var isLoading = true
     @State private var currentLineId: Int64? = nil
+    @State private var lyricOffset: Double = 0.0
+    @State private var showSyncControls: Bool = false
     
     var body: some View {
         ZStack {
             Color.pukiBackground.ignoresSafeArea()
             
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -2243,6 +2366,32 @@ struct LyricsSheetView: View {
                         }
                     }
                     Spacer()
+                    
+                    if let lrc = lyrics, lrc.isSynced && !lrc.lines.isEmpty {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                showSyncControls.toggle()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "slider.horizontal.below.square.and.square")
+                                    .font(.system(size: 12, weight: .semibold))
+                                if abs(lyricOffset) > 0.01 {
+                                    Text(String(format: "%+.1fs", lyricOffset))
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                } else {
+                                    Text("Sync")
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(abs(lyricOffset) > 0.01 ? Color.pukiAmber.opacity(0.25) : Color.white.opacity(0.08))
+                            .foregroundColor(abs(lyricOffset) > 0.01 ? .pukiAmber : .pukiTextSecondary)
+                            .cornerRadius(8)
+                        }
+                    }
+                    
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
@@ -2251,6 +2400,16 @@ struct LyricsSheetView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
+                
+                if showSyncControls {
+                    LyricSyncAdjusterBar(
+                        offset: $lyricOffset,
+                        onAdjust: { delta in adjustOffset(delta) },
+                        onReset: { resetOffset() }
+                    )
+                    .padding(.horizontal, 20)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
                 
                 if isLoading {
                     Spacer()
@@ -2263,18 +2422,24 @@ struct LyricsSheetView: View {
                             ScrollView(showsIndicators: false) {
                                 VStack(spacing: 22) {
                                     ForEach(lrc.lines) { line in
-                                        let isCurrent = isLineActive(line, allLines: lrc.lines)
-                                        Text(line.text)
-                                            .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
-                                            .foregroundColor(isCurrent ? .pukiAmber : .pukiTextSecondary.opacity(0.45))
-                                            .multilineTextAlignment(.center)
-                                            .scaleEffect(isCurrent ? 1.05 : 1.0)
-                                            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isCurrent)
-                                            .id(line.id)
+                                        let isCurrent = (line.id == currentLineId)
+                                        Button(action: {
+                                            let targetSec = (Double(line.timeMs) / 1000.0) + lyricOffset
+                                            playerManager.seek(to: max(0, targetSec))
+                                        }) {
+                                            Text(line.text)
+                                                .font(.system(size: isCurrent ? 24 : 17, weight: isCurrent ? .bold : .medium))
+                                                .foregroundColor(isCurrent ? .pukiAmber : .pukiTextSecondary.opacity(0.45))
+                                                .multilineTextAlignment(.center)
+                                                .scaleEffect(isCurrent ? 1.05 : 1.0)
+                                                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isCurrent)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .id(line.id)
                                     }
                                 }
                                 .padding(.horizontal, 24)
-                                .padding(.vertical, 40)
+                                .padding(.vertical, 30)
                             }
                             .onChange(of: playerManager.currentTime) { _ in
                                 updateCurrentLine(lines: lrc.lines, proxy: proxy)
@@ -2307,31 +2472,45 @@ struct LyricsSheetView: View {
         }
         .task {
             if let track = playerManager.currentTrack {
+                self.lyricOffset = LyricsService.shared.getOffset(for: track.id)
                 self.lyrics = await LyricsService.shared.getLyrics(track: track)
                 self.isLoading = false
             }
         }
     }
     
-    private func updateCurrentLine(lines: [LyricLine], proxy: ScrollViewProxy) {
-        let currentMs = Int64(playerManager.currentTime * 1000)
-        guard let active = lines.last(where: { currentMs >= $0.timeMs }) else { return }
-        if currentLineId != active.id {
+    private func adjustOffset(_ delta: Double) {
+        let newOffset = ((lyricOffset + delta) * 10).rounded() / 10
+        lyricOffset = newOffset
+        if let trackId = playerManager.currentTrack?.id {
+            LyricsService.shared.setOffset(newOffset, for: trackId)
+        }
+        let effMs = Int64((playerManager.currentTime - newOffset) * 1000)
+        if let active = lyrics?.lines.last(where: { effMs >= $0.timeMs }) {
             currentLineId = active.id
-            withAnimation(.easeInOut(duration: 0.3)) {
-                proxy.scrollTo(active.id, anchor: .center)
-            }
         }
     }
     
-    private func isLineActive(_ line: LyricLine, allLines: [LyricLine]) -> Bool {
-        let currentMs = Int64(playerManager.currentTime * 1000)
-        guard currentMs >= line.timeMs else { return false }
-        if let idx = allLines.firstIndex(where: { $0.id == line.id }),
-           idx + 1 < allLines.count {
-            return currentMs < allLines[idx + 1].timeMs
+    private func resetOffset() {
+        lyricOffset = 0.0
+        if let trackId = playerManager.currentTrack?.id {
+            LyricsService.shared.setOffset(0.0, for: trackId)
         }
-        return true
+        let effMs = Int64(playerManager.currentTime * 1000)
+        if let active = lyrics?.lines.last(where: { effMs >= $0.timeMs }) {
+            currentLineId = active.id
+        }
+    }
+    
+    private func updateCurrentLine(lines: [LyricLine], proxy: ScrollViewProxy) {
+        let effMs = Int64((playerManager.currentTime - lyricOffset) * 1000)
+        guard let active = lines.last(where: { effMs >= $0.timeMs }) else { return }
+        if currentLineId != active.id {
+            currentLineId = active.id
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(active.id, anchor: .center)
+            }
+        }
     }
 }
 

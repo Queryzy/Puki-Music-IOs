@@ -109,7 +109,6 @@ jobs:
                       'localizedDescription': f'Puki Music iOS {tag} Release Update',
                       'downloadURL': ipa_url,
                       'size': ipa_size,
-                      'sha256': ipa_sha256,
                       'minOSVersion': '16.0'
                   }
                   versions.insert(0, new_ver)
@@ -118,7 +117,7 @@ jobs:
                   existing[0]['downloadURL'] = ipa_url
                   existing[0]['date'] = now_iso
                   existing[0]['size'] = ipa_size
-                  existing[0]['sha256'] = ipa_sha256
+                  existing[0].pop('sha256', None)
               
               with open('apps.json', 'w') as f:
                   json.dump(data, f, indent=2)

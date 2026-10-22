@@ -1309,10 +1309,14 @@ struct SettingsTabView: View {
     @State private var showingExportSheet = false
     @State private var showingChangelog = false
     @State private var showingClearCacheAlert = false
+    @State private var showingCopyAlert = false
+    @State private var copyMessage: String = ""
     @State private var exportText: String = ""
     @State private var importMessage: String = ""
     @State private var showingAlert = false
     @State private var storageMB: Double = 0.0
+    
+    private let sideStoreSourceUrl = "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/apps.json"
     
     var body: some View {
         List {
@@ -1320,8 +1324,8 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.25"
-                    let bld = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "25"
+                    let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.26"
+                    let bld = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "26"
                     Text("v\(ver) (Build \(bld))")
                         .foregroundColor(.pukiCoral)
                         .fontWeight(.semibold)
@@ -1364,6 +1368,53 @@ struct SettingsTabView: View {
                     Spacer()
                     Text("AVPlayer + InnerTube Direct CDN")
                         .foregroundColor(.pukiTextSecondary)
+                }
+            }
+            .listRowBackground(Color.pukiCard)
+            
+            Section(header: Text("PEMBARUAN APLIKASI (SIDESTORE REPO)").foregroundColor(.pukiTextSecondary)) {
+                Button(action: {
+                    if let deepUrl = URL(string: "sidestore://source?url=\(sideStoreSourceUrl)") {
+                        UIApplication.shared.open(deepUrl) { success in
+                            if !success {
+                                UIPasteboard.general.string = sideStoreSourceUrl
+                                copyMessage = "URL Source disalin ke clipboard!\n\nBuka SideStore -> tab Sources -> tap tombol (+) di kanan atas lalu tempel URL ini."
+                                showingCopyAlert = true
+                            }
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                            .foregroundColor(.pukiCoral)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Buka / Tambah ke SideStore")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Auto-update 1-klik di SideStore tab My Apps")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
+                }
+                
+                Button(action: {
+                    UIPasteboard.general.string = sideStoreSourceUrl
+                    copyMessage = "URL Source disalin ke clipboard!\n\nBuka SideStore -> tab Sources -> tap tombol (+) di kanan atas lalu tempel:\n\(sideStoreSourceUrl)"
+                    showingCopyAlert = true
+                }) {
+                    HStack {
+                        Image(systemName: "doc.on.doc.fill")
+                            .foregroundColor(.pukiAmber)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Salin URL Repository Source")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15))
+                            Text("Untuk ditambahkan manual via SideStore -> Sources (+)")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
                 }
             }
             .listRowBackground(Color.pukiCard)
@@ -1489,6 +1540,11 @@ struct SettingsTabView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(importMessage)
+        }
+        .alert("SideStore Source", isPresented: $showingCopyAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(copyMessage)
         }
         .sheet(isPresented: $showingExportSheet) {
             ShareSheet(activityItems: [exportText])

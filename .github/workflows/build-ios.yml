@@ -15,6 +15,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Extract Version
+        id: get_version
+        run: |
+          VERSION=$(grep 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '"')
+          BUILD=$(grep 'CURRENT_PROJECT_VERSION:' project.yml | awk '{print $2}' | tr -d '"')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
       - name: Create Xcode Project via xcodegen
         run: |
           brew install xcodegen
@@ -46,15 +55,61 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.25
-          name: "Puki Music iOS v1.0.25"
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: "Puki Music iOS ${{ steps.get_version.outputs.tag }}"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.25
-            - **Dynamic App Version in Settings**: Settings now reads version and build directly from `Bundle.main.infoDictionary`.
-            - **Interactive Up-to-Date Changelog**: Complete release history from v1.0.3 to v1.0.25.
-            - **Direct GitHub Releases Shortcut**: Quick action to download and update IPA via SideStore.
+            ## Puki Music iOS Native (SwiftUI) ${{ steps.get_version.outputs.tag }}
+            - **SideStore Auto-Update Repository**: Added community source format `apps.json` for 1-click updates in SideStore.
+            - **Dynamic App Versioning**: Displaying real marketing version and build number in Settings.
+            - **LRC Timing Offset Adjuster**: Interactive real-time lyric sync stepper bar `[-0.5s] [-0.1s] [0.0s] [+0.1s] [+0.5s]`.
+            - **O(1) Lyric Active Match & 1Hz Remote Throttling**: Peak performance with zero UI stutter.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update SideStore apps.json
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        run: |
+          python3 -c "
+          import json, datetime
+          ver = '${{ steps.get_version.outputs.version }}'
+          tag = '${{ steps.get_version.outputs.tag }}'
+          now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+          
+          try:
+              with open('apps.json', 'r') as f:
+                  data = json.load(f)
+              
+              ipa_url = f'https://github.com/Queryzy/Puki-Music-IOs/releases/download/{tag}/Puki-Music.ipa'
+              app = data['apps'][0]
+              versions = app.get('versions', [])
+              
+              existing = [v for v in versions if v.get('version') == ver]
+              if not existing:
+                  new_ver = {
+                      'version': ver,
+                      'date': now_iso,
+                      'localizedDescription': f'Puki Music iOS {tag} Release Update',
+                      'downloadURL': ipa_url,
+                      'minOSVersion': '16.0'
+                  }
+                  versions.insert(0, new_ver)
+                  app['versions'] = versions[:10]
+              else:
+                  existing[0]['downloadURL'] = ipa_url
+                  existing[0]['date'] = now_iso
+              
+              with open('apps.json', 'w') as f:
+                  json.dump(data, f, indent=2)
+              print(f'Successfully updated apps.json for {tag}')
+          except Exception as e:
+              print(f'Failed to update apps.json: {e}')
+          "
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps.json
+          git commit -m "chore(repo): update apps.json to ${{ steps.get_version.outputs.tag }} [skip ci]" || echo "No changes to commit"
+          git push origin main || echo "Push skipped or not needed"
 
 

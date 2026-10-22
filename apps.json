@@ -1,0 +1,30 @@
+{
+  "name": "Puki Music Source",
+  "identifier": "com.puki.music.source",
+  "subtitle": "Official Puki Music iOS Repository",
+  "description": "High-Fidelity Native iOS Music Player with lossless audio, offline local playback, and real-time synchronized lyrics.",
+  "website": "https://github.com/Queryzy/Puki-Music-IOs",
+  "iconURL": "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/PukiMusic/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+  "headerURL": "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/PukiMusic/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+  "apps": [
+    {
+      "name": "Puki Music",
+      "bundleIdentifier": "com.puki.music.ios",
+      "developerName": "Puki Labs",
+      "subtitle": "Native Hi-Fi Music Player",
+      "localizedDescription": "High-Fidelity Native iOS Music Player with lossless audio, offline local playback, and real-time synchronized lyrics.",
+      "iconURL": "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/PukiMusic/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+      "tintColor": "FF5E3A",
+      "category": "music",
+      "versions": [
+        {
+          "version": "1.0.26",
+          "date": "2026-10-22T15:30:00+07:00",
+          "localizedDescription": "• SideStore Community Source Integration\n• Dynamic App Versioning\n• LRC Timing Offset Sync Adjuster Stepper\n• O(1) Performance Optimization\n• High-Res Artwork & Offline Cover Caching",
+          "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.26/Puki-Music.ipa",
+          "minOSVersion": "16.0"
+        }
+      ]
+    }
+  ]
+}

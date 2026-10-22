@@ -1320,8 +1320,11 @@ struct SettingsTabView: View {
                 HStack {
                     Text("Versi Aplikasi")
                     Spacer()
-                    Text("1.0.9 (iOS Native)")
+                    let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.25"
+                    let bld = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "25"
+                    Text("v\(ver) (Build \(bld))")
                         .foregroundColor(.pukiCoral)
+                        .fontWeight(.semibold)
                 }
                 
                 Button(action: { showingChangelog = true }) {
@@ -1332,6 +1335,19 @@ struct SettingsTabView: View {
                             .foregroundColor(.white)
                         Spacer()
                         Image(systemName: "chevron.right")
+                            .foregroundColor(.pukiTextSecondary)
+                            .font(.system(size: 13))
+                    }
+                }
+                
+                Link(destination: URL(string: "https://github.com/Queryzy/Puki-Music-IOs/releases")!) {
+                    HStack {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundColor(.pukiCoral)
+                        Text("Periksa Rilis & Unduh IPA")
+                            .foregroundColor(.white)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
                             .foregroundColor(.pukiTextSecondary)
                             .font(.system(size: 13))
                     }
@@ -1517,19 +1533,97 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.25 Card
+                        releaseCard(
+                            version: "v1.0.25 (Build 25)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Versi Dinamis: Pengaturan menampilkan versi & build riil dari bundle aplikasi.",
+                                "Akses Rilis Langsung: Tombol Pintasan ke GitHub Releases untuk update IPA via SideStore.",
+                                "Changelog Interaktif Terupdate: Riwayat lengkap pembaruan fitur & perbaikan bug."
+                            ]
+                        )
+                        
+                        // v1.0.24 Card
+                        releaseCard(
+                            version: "v1.0.24 (Build 24)",
+                            date: "Oktober 2026",
+                            badge: "LYRICS SYNC",
+                            changes: [
+                                "LRC Timing Offset Adjuster: Stepper [-0.5s] [-0.1s] [0.0s] [+0.1s] [+0.5s] di tab Lirik & modal lirik.",
+                                "Penyimpanan Sinkronisasi Per-Lagu: Offset timing tersimpan otomatis dan persisten di disk.",
+                                "Optimasi O(1) Active Lyric: Render lirik bebas lag dan stutter pada lirik panjang.",
+                                "Throttling MPNowPlayingInfo: Efisiensi CPU dan baterai tinggi saat layar mati / background."
+                            ]
+                        )
+                        
+                        // v1.0.23 Card
+                        releaseCard(
+                            version: "v1.0.23 (Build 23)",
+                            date: "Oktober 2026",
+                            badge: "CRITICAL FIX",
+                            changes: [
+                                "Fix Cover YouTube 404: Perbaikan bug penggantian string URL thumbnail hqhqdefault ganda.",
+                                "Penyimpanan Cover Fisik Offline: Unduh file artwork .jpg langsung ke direktori sandbox offline.",
+                                "Auto-healer URL: Pembersihan otomatis token query Google yang kadaluarsa."
+                            ]
+                        )
+                        
+                        // v1.0.22 Card
+                        releaseCard(
+                            version: "v1.0.22 (Build 22)",
+                            date: "Oktober 2026",
+                            badge: "CDN ENGINE",
+                            changes: [
+                                "Dukungan Google Content CDN: Ekstraksi thumbnail dari host googleusercontent.com dan ggpht.com.",
+                                "Fallback Otomatis: PukiArtworkImage otomatis beralih ke hqdefault jika resolusi khusus gagal."
+                            ]
+                        )
+                        
+                        // v1.0.21 Card
+                        releaseCard(
+                            version: "v1.0.21 (Build 21)",
+                            date: "Oktober 2026",
+                            badge: "ARTWORK UNIFY",
+                            changes: [
+                                "Unifikasi PukiArtworkImage: Seluruh view (Full Player, Queue, Home, Playlist) menggunakan engine artwork custom.",
+                                "Penghapusan SwiftUI AsyncImage: Mengeliminasi kegagalan render pada URL lokal file://."
+                            ]
+                        )
+                        
+                        // v1.0.18 Card
+                        releaseCard(
+                            version: "v1.0.18 (Build 18)",
+                            date: "Oktober 2026",
+                            badge: "CACHE ENGINE",
+                            changes: [
+                                "Memory Cache Terpusat (NSCache): Akses artwork instan tanpa download berulang.",
+                                "Header Safari User-Agent: Menghindari blokir atau throttling dari CDN media."
+                            ]
+                        )
+                        
+                        // v1.0.16 Card
+                        releaseCard(
+                            version: "v1.0.16 (Build 16)",
+                            date: "Oktober 2026",
+                            badge: "OFFLINE DOWNLOAD",
+                            changes: [
+                                "Indikator Persentase Unduhan: Menampilkan progress download numerik yang akurat.",
+                                "Integritas File Ketat: Verifikasi ukuran file (>150 KB) menjamin file audio tidak rusak atau 0 byte."
+                            ]
+                        )
+                        
                         // v1.0.9 Card
                         releaseCard(
                             version: "v1.0.9 (Build 9)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "STABILITY",
                             changes: [
-                                "Perbaikan Volume Stabil: Matikan Dynamic Range Processing & Spatial Audio iOS, volume tidak lagi mengecil atau membesar sendiri.",
-                                "Sistem Download & Offline Playback Tangguh: In-app persistent task dengan penyimpanan relatif ID pada manifest.",
-                                "Indikator Status Download: Ikon 3-state (abu-abu belum terunduh, kuning spinner proses unduh, hijau solid terunduh) dan tag OFFLINE.",
-                                "Logika Tombol Previous Standar: Restart lagu ke detik 0 jika > 3 detik, baru mundur track jika < 3 detik.",
-                                "Navigasi Non-Blocking: Pindah tab dari bottom bar langsung menutup overlay playlist/album seketika.",
-                                "Behavior Home Feed: Bar artis favorit dan section Sering Diputar terhubung langsung dari hasil import JSON Android.",
-                                "Player UI Proporsional & Cover HD: Resolusi cover 1000x1000, thumb scrubber lingkaran rapi, border halus, dan studio quality badge."
+                                "Perbaikan Volume Stabil: Matikan Dynamic Range Processing & Spatial Audio iOS.",
+                                "Sistem Download & Offline Playback Tangguh: In-app persistent task dengan penyimpanan relatif.",
+                                "Logika Tombol Previous Standar: Restart lagu ke detik 0 jika > 3 detik.",
+                                "Player UI Proporsional & Cover HD: Resolusi cover 1000x1000 dan studio quality badge."
                             ]
                         )
                         

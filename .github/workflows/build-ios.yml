@@ -46,13 +46,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.24
-          name: "Puki Music iOS v1.0.24"
+          tag_name: v1.0.25
+          name: "Puki Music iOS v1.0.25"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.24
-            - **Lyrics Timing Offset Sync Adjuster (Option A)**: Quick stepper buttons `[-0.5s] [-0.1s] [0.0s] [+0.1s] [+0.5s]` with real-time feedback and per-track persistence.
-            - **O(1) Active Lyric Matching**: Replaced O(N^2) linear searching inside ForEach with instant identifier equality.
-            - **Performance & Battery Optimization**: Throttled MPNowPlayingInfoCenter updates from 10Hz to 1Hz, saving CPU and battery during playback.
+            ## Puki Music iOS Native (SwiftUI) v1.0.25
+            - **Dynamic App Version in Settings**: Settings now reads version and build directly from `Bundle.main.infoDictionary`.
+            - **Interactive Up-to-Date Changelog**: Complete release history from v1.0.3 to v1.0.25.
+            - **Direct GitHub Releases Shortcut**: Quick action to download and update IPA via SideStore.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

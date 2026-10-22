@@ -47,13 +47,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.19
-          name: "Puki Music iOS v1.0.19"
+          tag_name: v1.0.20
+          name: "Puki Music iOS v1.0.20"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.19
-            - **Universal PukiArtworkImage Engine**: Replaced legacy SwiftUI `AsyncImage` across all views (FullScreen Player, Queue, Carousel, Top Chart, Playlists) with cached native renderer.
-            - **Memory & Disk Cache Tuning**: Added 64MB RAM limit / 250 entries + 100MB disk cache to eliminate stutter and prevent high memory footprint.
-            - **Lock Screen & Offline Artwork Parity**: `AudioPlayerManager` now prioritizes offline local `.jpg` covers directly for lock screen and dynamic controls.
+            ## Puki Music iOS Native (SwiftUI) v1.0.20
+            - **Unified Fast PukiArtworkImage**: Replaced all remaining AsyncImage in FullScreen Player, Queues, Deezer Carousel & Albums with optimized NSCache/Disk loader.
+            - **Memory Caching Budget**: Enforced 64MB RAM / 250 count limit + 100MB URLCache for snappy UI and zero stutter.
+            - **Lock Screen Offline Parity**: Prioritized local `.jpg` covers for `MPNowPlayingInfoCenter` lockscreen widget.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

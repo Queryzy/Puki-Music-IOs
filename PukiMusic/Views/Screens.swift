@@ -268,14 +268,8 @@ struct HomeDashboardView: View {
     
     private func albumCard(_ album: DeezerAlbum) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
-                img.resizable().scaledToFill()
-            } placeholder: {
-                Color.pukiCardElevated
-            }
-            .frame(width: 130, height: 130)
-            .cornerRadius(12)
-            .shadow(color: Color.pukiGlowMagenta.opacity(0.2), radius: 8, x: 0, y: 4)
+            PukiArtworkImage(urlString: album.highResCoverUrl, size: 140, cornerRadius: 12)
+            .shadow(color: Color.pukiGlowSunset.opacity(0.25), radius: 8, x: 0, y: 4)
             
             Text(album.title)
                 .font(.system(size: 13, weight: .semibold))
@@ -439,17 +433,7 @@ struct SearchTabView: View {
                                                 NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
                                             }) {
                                                 VStack(alignment: .leading, spacing: 6) {
-                                                    AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
-                                                        img.resizable().scaledToFill()
-                                                    } placeholder: {
-                                                        Color.pukiCardElevated
-                                                    }
-                                                    .frame(width: 130, height: 130)
-                                                    .cornerRadius(10)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 10)
-                                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                                    )
+                                                    PukiArtworkImage(urlString: album.highResCoverUrl, size: 130, cornerRadius: 10)
                                                     
                                                     Text(album.title)
                                                         .font(.system(size: 13, weight: .bold))
@@ -679,13 +663,7 @@ struct AlbumDetailSheetView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         // Album Header Info Card
                         HStack(spacing: 16) {
-                            AsyncImage(url: URL(string: album.highResCoverUrl)) { img in
-                                img.resizable().scaledToFill()
-                            } placeholder: {
-                                Color.pukiCardElevated
-                            }
-                            .frame(width: 84, height: 84)
-                            .cornerRadius(12)
+                            PukiArtworkImage(urlString: album.highResCoverUrl, size: 84, cornerRadius: 12)
                             .shadow(color: Color.pukiGlowMagenta.opacity(0.3), radius: 10, x: 0, y: 4)
                             
                             VStack(alignment: .leading, spacing: 4) {
@@ -2422,7 +2400,7 @@ struct PukiArtworkImage: View {
         .onAppear {
             loadImage()
         }
-        .onChange(of: urlString) { _ in
+        .onChange(of: urlString) { newValue in
             loadImage()
         }
     }

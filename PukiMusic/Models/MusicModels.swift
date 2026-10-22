@@ -48,19 +48,17 @@ struct Track: Identifiable, Codable, Equatable {
             url = ""
         }
         
-        // 2. Normalisasi YouTube ID untuk cover fallback
-        let cleanVid = Track.normalizeId(id)
-        if url.isEmpty {
-            if !id.hasPrefix("dz_") && (cleanVid.count == 11 || !cleanVid.isEmpty) {
-                return "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
-            }
-        }
-        
-        // 3. Bersihkan token expired query parameter (?sqp=...) dari thumbnail YouTube
+        // 2. Bersihkan token expired query parameter (?sqp=...) dari thumbnail YouTube
         if url.contains("ytimg.com") {
             if let qIdx = url.firstIndex(of: "?") {
                 url = String(url[..<qIdx])
             }
+        }
+        
+        // 3. Normalisasi YouTube ID untuk cover fallback jika URL kosong / ytimg gagal
+        let cleanVid = Track.normalizeId(id)
+        if url.isEmpty && !id.hasPrefix("dz_") && !cleanVid.isEmpty {
+            return "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
         }
         
         if url.contains("deezer.com") {
@@ -68,7 +66,7 @@ struct Track: Identifiable, Codable, Equatable {
             url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")
             url = url.replacingOccurrences(of: "/120x120-", with: "/500x500-")
             url = url.replacingOccurrences(of: "/56x56-", with: "/500x500-")
-        } else if url.contains("ytimg.com") || url.contains("ggpht.com") {
+        } else if url.contains("ytimg.com") || url.contains("ggpht.com") || url.contains("googleusercontent.com") {
             // hqdefault and sddefault are always available on YouTube servers (maxresdefault often 404s)
             url = url.replacingOccurrences(of: "default.jpg", with: "hqdefault.jpg")
             url = url.replacingOccurrences(of: "mqdefault.jpg", with: "hqdefault.jpg")

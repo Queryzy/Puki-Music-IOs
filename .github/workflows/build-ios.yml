@@ -46,13 +46,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.21
-          name: "Puki Music iOS v1.0.21"
+          tag_name: v1.0.22
+          name: "Puki Music iOS v1.0.22"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.21
-            - **100% Native Artwork Renderer (No AsyncImage)**: Replaced every single AsyncImage across all screens (Home, Albums, Search, Queues, FullPlayer, Playlists) with lightweight `PukiArtworkImage`.
-            - **Lockscreen & Player Parity**: Unified cover image caching and local fallback via `UIImage(contentsOfFile:)` and URLSession with Safari User-Agent.
-            - **Lightweight Memory Management**: Pure `NSCache` memory caching with low overhead.
+            ## Puki Music iOS Native (SwiftUI) v1.0.22
+            - **Google & YouTube Content CDN Support**: Added regex support for `googleusercontent.com` and `ggpht.com` thumbnails exported from Android YouTube Music.
+            - **Resilient Fallback Loader**: `PukiArtworkImage` automatically falls back to `hqdefault.jpg` if custom/expired thumbnail dimensions fail to load.
+            - **Order of Operations Fix**: Query string strip applied before fallback checks.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2406,7 +2406,11 @@ struct PukiArtworkImage: View {
         }
         
         // 3. Web URL fetch dengan proper Headers & Timeout
-        guard let url = URL(string: clean) else { return }
+        guard let url = URL(string: clean) else {
+            self.loadedImage = nil
+            self.isLoading = false
+            return
+        }
         self.isLoading = true
         
         var req = URLRequest(url: url)
@@ -2414,15 +2418,37 @@ struct PukiArtworkImage: View {
         req.timeoutInterval = 10
         
         URLSession.shared.dataTask(with: req) { data, resp, err in
-            guard let data = data, let img = UIImage(data: data) else {
+            if let data = data, let img = UIImage(data: data) {
+                Self.imageCache.setObject(img, forKey: clean as NSString)
                 DispatchQueue.main.async {
+                    self.loadedImage = img
                     self.isLoading = false
                 }
                 return
             }
-            Self.imageCache.setObject(img, forKey: clean as NSString)
+            
+            // 4. Fallback ke YouTube hqdefault standar jika URL khusus gagal/404
+            if clean.contains("ytimg.com") && !clean.contains("hqdefault.jpg") {
+                let fallback = "https://i.ytimg.com/vi/\(Track.normalizeId(clean))/hqdefault.jpg"
+                if let fUrl = URL(string: fallback), fUrl != url {
+                    var fReq = URLRequest(url: fUrl)
+                    fReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                    URLSession.shared.dataTask(with: fReq) { fData, _, _ in
+                        if let fData = fData, let fImg = UIImage(data: fData) {
+                            Self.imageCache.setObject(fImg, forKey: clean as NSString)
+                            DispatchQueue.main.async {
+                                self.loadedImage = fImg
+                                self.isLoading = false
+                            }
+                            return
+                        }
+                        DispatchQueue.main.async { self.isLoading = false }
+                    }.resume()
+                    return
+                }
+            }
+            
             DispatchQueue.main.async {
-                self.loadedImage = img
                 self.isLoading = false
             }
         }.resume()

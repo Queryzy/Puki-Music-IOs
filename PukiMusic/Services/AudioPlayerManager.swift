@@ -342,10 +342,24 @@ class AudioPlayerManager: ObservableObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         
-        // Artwork async load
-        if let artUrl = URL(string: track.thumbnailUrl) {
-            Task {
-                if let (data, _) = try? await URLSession.shared.data(from: artUrl),
+        // Artwork async load (Local first -> Fallback network URLSession)
+        Task {
+            if let localCover = DownloadService.shared.getLocalCoverFileUrl(for: track.id),
+               let localImage = UIImage(contentsOfFile: localCover.path) {
+                let artwork = MPMediaItemArtwork(boundsSize: localImage.size) { _ in localImage }
+                var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                currentInfo[MPMediaItemPropertyArtwork] = artwork
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
+                return
+            }
+            
+            let artUrlStr = track.highResThumbnailUrl
+            if let artUrl = URL(string: artUrlStr) {
+                var req = URLRequest(url: artUrl)
+                req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                req.timeoutInterval = 10
+                
+                if let (data, _) = try? await URLSession.shared.data(for: req),
                    let image = UIImage(data: data) {
                     let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                     var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]

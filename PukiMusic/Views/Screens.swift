@@ -127,13 +127,7 @@ struct HomeDashboardView: View {
                                     }) {
                                         VStack(alignment: .leading, spacing: 6) {
                                             ZStack(alignment: .bottomTrailing) {
-                                                AsyncImage(url: URL(string: t.highResThumbnailUrl)) { img in
-                                                    img.resizable().scaledToFill()
-                                                } placeholder: {
-                                                    Color.pukiCardElevated
-                                                }
-                                                .frame(width: 130, height: 130)
-                                                .cornerRadius(12)
+                                                PukiArtworkImage(urlString: t.highResThumbnailUrl, size: 130, cornerRadius: 12)
                                                 
                                                 if downloadService.isTrackOffline(trackId: t.id) {
                                                     Image(systemName: "checkmark.circle.fill")
@@ -244,13 +238,7 @@ struct HomeDashboardView: View {
             playerManager.play(track: track)
         }) {
             VStack(alignment: .leading, spacing: 8) {
-                AsyncImage(url: URL(string: dTrack.highResCoverUrl)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Color.pukiCardElevated
-                }
-                .frame(width: 140, height: 140)
-                .cornerRadius(12)
+                PukiArtworkImage(urlString: dTrack.highResCoverUrl, size: 140, cornerRadius: 12)
                 .shadow(color: Color.pukiGlowSunset.opacity(0.25), radius: 8, x: 0, y: 4)
                 
                 Text(dTrack.title)
@@ -1819,21 +1807,7 @@ struct FullScreenPlayerView: View {
                         if playerCenterMode == 0 {
                             // 0: Artwork HD 1000x1000 + Quality Studio Badge
                             VStack(spacing: 14) {
-                                AsyncImage(url: URL(string: track.highResThumbnailUrl)) { img in
-                                    img.resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    ZStack {
-                                        Color.pukiCardElevated
-                                        ProgressView().tint(.pukiCoral)
-                                    }
-                                }
-                                .frame(width: 280, height: 280)
-                                .clipShape(RoundedRectangle(cornerRadius: 18))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18)
-                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                                )
+                                PukiArtworkImage(urlString: track.highResThumbnailUrl, size: 280, cornerRadius: 18)
                                 .shadow(color: Color.pukiCoral.opacity(0.25), radius: 20, x: 0, y: 10)
                                 
                                 // Studio Quality Badge (1:1 Android)
@@ -2119,13 +2093,7 @@ struct QueueListView: View {
                                         .foregroundColor(isCur ? .pukiCoral : .pukiTextSecondary)
                                         .frame(width: 22)
                                     
-                                    AsyncImage(url: URL(string: t.highResThumbnailUrl)) { img in
-                                        img.resizable().scaledToFill()
-                                    } placeholder: {
-                                        Color.pukiCardElevated
-                                    }
-                                    .frame(width: 38, height: 38)
-                                    .cornerRadius(6)
+                                    PukiArtworkImage(urlString: t.highResThumbnailUrl, size: 38, cornerRadius: 6)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(t.title)
@@ -2409,8 +2377,21 @@ struct PukiArtworkImage: View {
     @State private var loadedImage: UIImage? = nil
     @State private var isLoading: Bool = false
     
-    // In-memory static cache agar gambar yang sudah ter-download tidak perlu re-fetch
-    private static let imageCache = NSCache<NSString, UIImage>()
+    // In-memory static cache terpusat dengan memory budget limit
+    private static let imageCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 250 // Max 250 images in RAM
+        cache.totalCostLimit = 64 * 1024 * 1024 // Max 64MB memory footprint
+        return cache
+    }()
+    
+    // Shared URLSession with disk cache configuration
+    private static let sharedSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024, diskPath: "puki_artwork_cache")
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        return config
+    }()
     
     var body: some View {
         ZStack {
@@ -2478,14 +2459,14 @@ struct PukiArtworkImage: View {
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
         req.timeoutInterval = 10
         
-        URLSession.shared.dataTask(with: req) { data, resp, err in
+        Self.sharedSession.dataTask(with: req) { data, resp, err in
             guard let data = data, let img = UIImage(data: data) else {
                 DispatchQueue.main.async {
                     self.isLoading = false
                 }
                 return
             }
-            Self.imageCache.setObject(img, forKey: clean as NSString)
+            Self.imageCache.setObject(img, forKey: clean as NSString, cost: data.count)
             DispatchQueue.main.async {
                 self.loadedImage = img
                 self.isLoading = false

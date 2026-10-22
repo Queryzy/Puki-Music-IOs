@@ -66,10 +66,21 @@ struct Track: Identifiable, Codable, Equatable {
             url = url.replacingOccurrences(of: "/250x250-", with: "/500x500-")
             url = url.replacingOccurrences(of: "/120x120-", with: "/500x500-")
             url = url.replacingOccurrences(of: "/56x56-", with: "/500x500-")
-        } else if url.contains("ytimg.com") || url.contains("ggpht.com") || url.contains("googleusercontent.com") {
-            // hqdefault and sddefault are always available on YouTube servers (maxresdefault often 404s)
-            url = url.replacingOccurrences(of: "default.jpg", with: "hqdefault.jpg")
-            url = url.replacingOccurrences(of: "mqdefault.jpg", with: "hqdefault.jpg")
+        } else if url.contains("ytimg.com") {
+            // Perbaiki jika ada double hq akibat bug versi sebelumnya
+            url = url.replacingOccurrences(of: "hqhqdefault.jpg", with: "hqdefault.jpg")
+            url = url.replacingOccurrences(of: "mqhqdefault.jpg", with: "hqdefault.jpg")
+            url = url.replacingOccurrences(of: "sdhqdefault.jpg", with: "hqdefault.jpg")
+            
+            // Upgrade thumbnail beresolusi rendah ke hqdefault secara aman
+            if url.hasSuffix("/default.jpg") {
+                url = url.replacingOccurrences(of: "/default.jpg", with: "/hqdefault.jpg")
+            } else if url.hasSuffix("/mqdefault.jpg") {
+                url = url.replacingOccurrences(of: "/mqdefault.jpg", with: "/hqdefault.jpg")
+            } else if url.hasSuffix("/sddefault.jpg") {
+                url = url.replacingOccurrences(of: "/sddefault.jpg", with: "/hqdefault.jpg")
+            }
+        } else if url.contains("googleusercontent.com") || url.contains("ggpht.com") {
             url = url.replacingOccurrences(of: "=w120-h120", with: "=w600-h600")
             url = url.replacingOccurrences(of: "=s120", with: "=s600")
             url = url.replacingOccurrences(of: "=s60", with: "=s600")

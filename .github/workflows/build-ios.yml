@@ -46,13 +46,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.22
-          name: "Puki Music iOS v1.0.22"
+          tag_name: v1.0.23
+          name: "Puki Music iOS v1.0.23"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.22
-            - **Google & YouTube Content CDN Support**: Added regex support for `googleusercontent.com` and `ggpht.com` thumbnails exported from Android YouTube Music.
-            - **Resilient Fallback Loader**: `PukiArtworkImage` automatically falls back to `hqdefault.jpg` if custom/expired thumbnail dimensions fail to load.
-            - **Order of Operations Fix**: Query string strip applied before fallback checks.
+            ## Puki Music iOS Native (SwiftUI) v1.0.23
+            - **CRITICAL FIX**: Fixed string replacement bug that mutated `hqdefault.jpg` into `hqhqdefault.jpg` causing 404 on all YouTube covers.
+            - **URLSession Background Task Fix**: Fixed physical offline cover download by decoupling from background session.
+            - **Auto-healer for corrupted URLs**: Stripped query tokens and repaired any legacy `hqhqdefault` strings.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

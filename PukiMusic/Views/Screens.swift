@@ -2382,11 +2382,21 @@ struct PukiArtworkImage: View {
     }
     
     private func loadImage() {
-        let clean = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        var clean = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else {
             self.loadedImage = nil
             self.isLoading = false
             return
+        }
+        
+        // Bersihkan artifact double-prefix atau query parameter yang merusak URL
+        if clean.contains("ytimg.com") {
+            clean = clean.replacingOccurrences(of: "hqhqdefault.jpg", with: "hqdefault.jpg")
+            clean = clean.replacingOccurrences(of: "mqhqdefault.jpg", with: "hqdefault.jpg")
+            clean = clean.replacingOccurrences(of: "sdhqdefault.jpg", with: "hqdefault.jpg")
+            if let qIdx = clean.firstIndex(of: "?") {
+                clean = String(clean[..<qIdx])
+            }
         }
         
         // 1. Cek memory cache
@@ -2428,9 +2438,10 @@ struct PukiArtworkImage: View {
             }
             
             // 4. Fallback ke YouTube hqdefault standar jika URL khusus gagal/404
-            if clean.contains("ytimg.com") && !clean.contains("hqdefault.jpg") {
-                let fallback = "https://i.ytimg.com/vi/\(Track.normalizeId(clean))/hqdefault.jpg"
-                if let fUrl = URL(string: fallback), fUrl != url {
+            let cleanVid = Track.normalizeId(clean)
+            if !cleanVid.isEmpty && (clean.contains("ytimg.com") || clean.contains("youtube") || clean.contains("googleusercontent.com")) {
+                let fallback = "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
+                if fallback != clean, let fUrl = URL(string: fallback) {
                     var fReq = URLRequest(url: fUrl)
                     fReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
                     URLSession.shared.dataTask(with: fReq) { fData, _, _ in

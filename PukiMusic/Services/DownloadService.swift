@@ -236,14 +236,16 @@ class DownloadService: NSObject, ObservableObject, URLSessionDownloadDelegate {
             let metaTrack = self.trackMetaPending[tid]
             let thumbUrlStr = metaTrack?.highResThumbnailUrl ?? ""
             if let thumbUrl = URL(string: thumbUrlStr), thumbUrl.scheme == "http" || thumbUrl.scheme == "https" {
-                Task {
-                    let coverDest = self.getOfflineDirectory().appendingPathComponent("\(safeName).jpg")
-                    if !FileManager.default.fileExists(atPath: coverDest.path) {
-                        if let (imgData, imgResp) = try? await self.downloadSession.data(from: thumbUrl),
+                let coverDest = self.getOfflineDirectory().appendingPathComponent("\(safeName).jpg")
+                if !FileManager.default.fileExists(atPath: coverDest.path) {
+                    var imgReq = URLRequest(url: thumbUrl)
+                    imgReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                    URLSession.shared.dataTask(with: imgReq) { imgData, imgResp, _ in
+                        if let imgData = imgData,
                            let httpImg = imgResp as? HTTPURLResponse, httpImg.statusCode == 200, imgData.count > 500 {
                             try? imgData.write(to: coverDest)
                         }
-                    }
+                    }.resume()
                 }
             }
             

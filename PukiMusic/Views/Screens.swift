@@ -70,19 +70,8 @@ struct HomeDashboardView: View {
                                         NotificationCenter.default.post(name: NSNotification.Name("SearchArtist"), object: artist.name)
                                     }) {
                                         VStack(spacing: 6) {
-                                            AsyncImage(url: URL(string: artist.avatarUrl)) { img in
-                                                img.resizable().scaledToFill()
-                                            } placeholder: {
-                                                ZStack {
-                                                    Circle().fill(Color.pukiCardElevated)
-                                                    Text(String(artist.name.prefix(1)))
-                                                        .font(.system(size: 18, weight: .bold))
-                                                        .foregroundColor(.white)
-                                                }
-                                            }
-                                            .frame(width: 64, height: 64)
-                                            .clipShape(Circle())
-                                            .overlay(Circle().stroke(Color.pukiCoral.opacity(0.4), lineWidth: 1.5))
+                                            PukiArtworkImage(urlString: artist.avatarUrl, size: 64, cornerRadius: 32)
+                                                .overlay(Circle().stroke(Color.pukiCoral.opacity(0.4), lineWidth: 1.5))
                                             
                                             Text(artist.name)
                                                 .font(.system(size: 11, weight: .medium))
@@ -2355,21 +2344,8 @@ struct PukiArtworkImage: View {
     @State private var loadedImage: UIImage? = nil
     @State private var isLoading: Bool = false
     
-    // In-memory static cache terpusat dengan memory budget limit
-    private static let imageCache: NSCache<NSString, UIImage> = {
-        let cache = NSCache<NSString, UIImage>()
-        cache.countLimit = 250 // Max 250 images in RAM
-        cache.totalCostLimit = 64 * 1024 * 1024 // Max 64MB memory footprint
-        return cache
-    }()
-    
-    // Shared URLSession with disk cache configuration
-    private static let sharedSession: URLSession = {
-        let config = URLSessionConfiguration.default
-        config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024, diskPath: "puki_artwork_cache")
-        config.requestCachePolicy = .returnCacheDataElseLoad
-        return config
-    }()
+    // In-memory static cache terpusat
+    private static let imageCache = NSCache<NSString, UIImage>()
     
     var body: some View {
         ZStack {
@@ -2400,7 +2376,7 @@ struct PukiArtworkImage: View {
         .onAppear {
             loadImage()
         }
-        .onChange(of: urlString) { newValue in
+        .onChange(of: urlString) { _ in
             loadImage()
         }
     }
@@ -2437,14 +2413,14 @@ struct PukiArtworkImage: View {
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
         req.timeoutInterval = 10
         
-        Self.sharedSession.dataTask(with: req) { data, resp, err in
+        URLSession.shared.dataTask(with: req) { data, resp, err in
             guard let data = data, let img = UIImage(data: data) else {
                 DispatchQueue.main.async {
                     self.isLoading = false
                 }
                 return
             }
-            Self.imageCache.setObject(img, forKey: clean as NSString, cost: data.count)
+            Self.imageCache.setObject(img, forKey: clean as NSString)
             DispatchQueue.main.async {
                 self.loadedImage = img
                 self.isLoading = false

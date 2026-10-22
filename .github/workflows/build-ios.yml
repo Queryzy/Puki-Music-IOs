@@ -20,10 +20,8 @@ jobs:
           brew install xcodegen
           xcodegen generate --spec project.yml
 
-
       - name: Build IPA (Ad-Hoc / Unsigned for SideStore & Sideloadly)
         run: |
-          set -o pipefail
           xcodebuild clean archive \
             -project PukiMusic.xcodeproj \
             -scheme PukiMusic \
@@ -31,7 +29,7 @@ jobs:
             -archivePath build/PukiMusic.xcarchive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || (echo "=== XCODEBUILD FAILED ===" && tail -n 100 xcodebuild.log && exit 1)
+            CODE_SIGNING_ALLOWED=NO
 
           mkdir -p build/Payload
           cp -r build/PukiMusic.xcarchive/Products/Applications/PukiMusic.app build/Payload/
@@ -48,13 +46,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.20
-          name: "Puki Music iOS v1.0.20"
+          tag_name: v1.0.21
+          name: "Puki Music iOS v1.0.21"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.20
-            - **Unified Fast PukiArtworkImage**: Replaced all remaining AsyncImage in FullScreen Player, Queues, Deezer Carousel & Albums with optimized NSCache/Disk loader.
-            - **Memory Caching Budget**: Enforced 64MB RAM / 250 count limit + 100MB URLCache for snappy UI and zero stutter.
-            - **Lock Screen Offline Parity**: Prioritized local `.jpg` covers for `MPNowPlayingInfoCenter` lockscreen widget.
+            ## Puki Music iOS Native (SwiftUI) v1.0.21
+            - **100% Native Artwork Renderer (No AsyncImage)**: Replaced every single AsyncImage across all screens (Home, Albums, Search, Queues, FullPlayer, Playlists) with lightweight `PukiArtworkImage`.
+            - **Lockscreen & Player Parity**: Unified cover image caching and local fallback via `UIImage(contentsOfFile:)` and URLSession with Safari User-Agent.
+            - **Lightweight Memory Management**: Pure `NSCache` memory caching with low overhead.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

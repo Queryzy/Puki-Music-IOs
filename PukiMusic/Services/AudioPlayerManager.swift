@@ -359,13 +359,15 @@ class AudioPlayerManager: ObservableObject {
                 req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
                 req.timeoutInterval = 10
                 
-                if let (data, _) = try? await URLSession.shared.data(for: req),
-                   let image = UIImage(data: data) {
-                    let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-                    var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-                    currentInfo[MPMediaItemPropertyArtwork] = artwork
-                    MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
-                }
+                URLSession.shared.dataTask(with: req) { data, _, _ in
+                    guard let data = data, let image = UIImage(data: data) else { return }
+                    DispatchQueue.main.async {
+                        let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                        var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                        currentInfo[MPMediaItemPropertyArtwork] = artwork
+                        MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
+                    }
+                }.resume()
             }
         }
         

@@ -23,6 +23,7 @@ jobs:
 
       - name: Build IPA (Ad-Hoc / Unsigned for SideStore & Sideloadly)
         run: |
+          set -o pipefail
           xcodebuild clean archive \
             -project PukiMusic.xcodeproj \
             -scheme PukiMusic \
@@ -30,7 +31,7 @@ jobs:
             -archivePath build/PukiMusic.xcarchive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || (echo "=== XCODEBUILD FAILED ===" && tail -n 100 xcodebuild.log && exit 1)
 
           mkdir -p build/Payload
           cp -r build/PukiMusic.xcarchive/Products/Applications/PukiMusic.app build/Payload/

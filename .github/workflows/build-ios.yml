@@ -47,13 +47,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.17
-          name: "Puki Music iOS v1.0.17"
+          tag_name: v1.0.18
+          name: "Puki Music iOS v1.0.18"
           body: |
-            ## Puki Music iOS Native (SwiftUI) v1.0.17
-            - **POSIX Safe Filename Sanitizer (1:1 Android)**: Fixed download destination crash when track ID is a full YouTube URL (`https://...`).
-            - **Universal Track ID Normalization**: Added `Track.normalizeId` to extract clean 11-char video IDs from all imported Android YouTube URLs.
-            - **URL Query Stripping**: Cleaned expired `?sqp=...` tokens from YouTube thumbnails to prevent 403 / blank covers.
+            ## Puki Music iOS Native (SwiftUI) v1.0.18
+            - **PukiArtworkImage Engine (1:1 Android Coil)**: Replaced native SwiftUI `AsyncImage` with custom `NSCache` image loader that handles HTTP User-Agent and resolves both local `file://` offline covers and remote CDN URLs.
+            - **Reliable Cover Display**: Fixed missing playlist covers for popular and imported YouTube tracks.
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

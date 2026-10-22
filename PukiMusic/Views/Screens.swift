@@ -502,13 +502,7 @@ struct SearchTabView: View {
                                         playerManager.play(track: track)
                                     }) {
                                         HStack(spacing: 12) {
-                                            AsyncImage(url: URL(string: track.highResThumbnailUrl)) { img in
-                                                img.resizable().scaledToFill()
-                                            } placeholder: {
-                                                Color.pukiCardElevated
-                                            }
-                                            .frame(width: 52, height: 52)
-                                            .cornerRadius(8)
+                                            PukiArtworkImage(urlString: track.highResThumbnailUrl, size: 52, cornerRadius: 8)
                                             
                                             VStack(alignment: .leading, spacing: 3) {
                                                 Text(track.title)
@@ -1087,13 +1081,7 @@ struct LibraryTabView: View {
             playerManager.play(track: track, fromQueue: store.favorites)
         }) {
             HStack(spacing: 12) {
-                AsyncImage(url: URL(string: track.highResThumbnailUrl)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Color.pukiCardElevated
-                }
-                .frame(width: 48, height: 48)
-                .cornerRadius(8)
+                PukiArtworkImage(urlString: track.highResThumbnailUrl, size: 48, cornerRadius: 8)
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(track.title)
@@ -1292,20 +1280,7 @@ struct PlaylistDetailSheetView: View {
                                     playerManager.play(track: t, fromQueue: livePlaylist.tracks)
                                 }) {
                                     HStack(spacing: 12) {
-                                        if !t.highResThumbnailUrl.isEmpty {
-                                            AsyncImage(url: URL(string: t.highResThumbnailUrl)) { img in
-                                                img.resizable().scaledToFill()
-                                            } placeholder: {
-                                                Color.pukiCardElevated
-                                            }
-                                            .frame(width: 44, height: 44)
-                                            .cornerRadius(6)
-                                        } else {
-                                            Text(String(format: "%02d", idx + 1))
-                                                .font(.system(size: 12, design: .monospaced))
-                                                .foregroundColor(.pukiTextSecondary)
-                                                .frame(width: 24)
-                                        }
+                                        PukiArtworkImage(urlString: t.highResThumbnailUrl, size: 44, cornerRadius: 6)
                                         
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(t.title)
@@ -2422,6 +2397,100 @@ struct LyricsSheetView: View {
             return currentMs < allLines[idx + 1].timeMs
         }
         return true
+    }
+}
+
+// MARK: - Smart Cached Track Artwork Component (1:1 Android Coil AsyncImage)
+struct PukiArtworkImage: View {
+    let urlString: String
+    var size: CGFloat = 44
+    var cornerRadius: CGFloat = 6
+    
+    @State private var loadedImage: UIImage? = nil
+    @State private var isLoading: Bool = false
+    
+    // In-memory static cache agar gambar yang sudah ter-download tidak perlu re-fetch
+    private static let imageCache = NSCache<NSString, UIImage>()
+    
+    var body: some View {
+        ZStack {
+            if let img = loadedImage {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipped()
+            } else {
+                ZStack {
+                    Color.pukiCardElevated
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .pukiAmber))
+                            .scaleEffect(0.6)
+                    } else {
+                        Image(systemName: "music.note")
+                            .font(.system(size: size * 0.4))
+                            .foregroundColor(.pukiTextSecondary.opacity(0.6))
+                    }
+                }
+                .frame(width: size, height: size)
+            }
+        }
+        .frame(width: size, height: size)
+        .cornerRadius(cornerRadius)
+        .onAppear {
+            loadImage()
+        }
+        .onChange(of: urlString) { _ in
+            loadImage()
+        }
+    }
+    
+    private func loadImage() {
+        let clean = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else {
+            self.loadedImage = nil
+            self.isLoading = false
+            return
+        }
+        
+        // 1. Cek memory cache
+        if let cached = Self.imageCache.object(forKey: clean as NSString) {
+            self.loadedImage = cached
+            return
+        }
+        
+        // 2. Cek apakah ini local file URL (file://...)
+        if clean.hasPrefix("file://") || clean.hasPrefix("/") {
+            let path = clean.hasPrefix("file://") ? URL(string: clean)?.path ?? clean : clean
+            if let img = UIImage(contentsOfFile: path) {
+                Self.imageCache.setObject(img, forKey: clean as NSString)
+                self.loadedImage = img
+                return
+            }
+        }
+        
+        // 3. Web URL fetch dengan proper Headers & Timeout
+        guard let url = URL(string: clean) else { return }
+        self.isLoading = true
+        
+        var req = URLRequest(url: url)
+        req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 10
+        
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            guard let data = data, let img = UIImage(data: data) else {
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                }
+                return
+            }
+            Self.imageCache.setObject(img, forKey: clean as NSString)
+            DispatchQueue.main.async {
+                self.loadedImage = img
+                self.isLoading = false
+            }
+        }.resume()
     }
 }
 

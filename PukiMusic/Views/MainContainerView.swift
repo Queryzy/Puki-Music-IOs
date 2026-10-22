@@ -192,14 +192,8 @@ struct MiniPlayerView: View {
             .frame(height: 2)
             
             HStack(spacing: 12) {
-                // Artwork
-                AsyncImage(url: URL(string: track.thumbnailUrl)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Color.pukiCardElevated
-                }
-                .frame(width: 44, height: 44)
-                .cornerRadius(6)
+                // Artwork (1:1 Android Coil Native Cache)
+                PukiArtworkImage(urlString: track.highResThumbnailUrl, size: 44, cornerRadius: 6)
                 
                 // Track Info
                 VStack(alignment: .leading, spacing: 2) {

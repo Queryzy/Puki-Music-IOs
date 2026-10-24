@@ -165,6 +165,7 @@ final class SyncManager: ObservableObject {
 
         Task {
             await self.registerVaultOnServer(vaultId: newVaultId, authVerifier: keys.authVerifierHex)
+            self.seedLocalDataToOutbox(force: true)
             await self.syncDelta()
         }
 
@@ -216,6 +217,7 @@ final class SyncManager: ObservableObject {
             self.isSyncEnabled = true
             self.connectionState = .connecting
 
+            seedLocalDataToOutbox(force: true)
             triggerSyncNow()
             startPolling()
             return true
@@ -253,8 +255,98 @@ final class SyncManager: ObservableObject {
         triggerSyncNow()
     }
 
-    func triggerSyncNow() {
-        guard isSyncEnabled, !isSyncing else { return }
+    func seedLocalDataToOutbox(force: Bool = false) {
+        guard isSyncEnabled, let vaultId = defaults.string(forKey: kPrefVaultId) else { return }
+        let seededKey = "kPrefInitialSeedDone_\(vaultId)"
+        if defaults.bool(forKey: seededKey) && !force {
+            return
+        }
+
+        let store = LocalMusicStore.shared
+
+        // 1. Seed All Favorites
+        for track in store.favorites {
+            let event = SyncEventPayload(
+                id: UUID().uuidString.lowercased(),
+                action: "TOGGLE_FAVORITE",
+                timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                data: [
+                    "isLiked": AnyCodable(true),
+                    "track": AnyCodable([
+                        "id": track.id,
+                        "title": track.title,
+                        "artist": track.artist,
+                        "duration": track.durationSeconds,
+                        "thumbnailUrl": track.thumbnailUrl
+                    ])
+                ]
+            )
+            var outbox = loadOutbox()
+            outbox.append(event)
+            saveOutbox(outbox)
+        }
+
+        // 2. Seed All Recent Searches
+        for query in store.recentSearches {
+            let event = SyncEventPayload(
+                id: UUID().uuidString.lowercased(),
+                action: "ADD_SEARCH",
+                timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                data: ["query": AnyCodable(query)]
+            )
+            var outbox = loadOutbox()
+            outbox.append(event)
+            saveOutbox(outbox)
+        }
+
+        // 3. Seed Playlists
+        for pl in store.playlists {
+            let createEvent = SyncEventPayload(
+                id: UUID().uuidString.lowercased(),
+                action: "UPDATE_PLAYLIST",
+                timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                data: [
+                    "playlistId": AnyCodable(pl.id),
+                    "name": AnyCodable(pl.name),
+                    "operation": AnyCodable("CREATE")
+                ]
+            )
+            var outbox = loadOutbox()
+            outbox.append(createEvent)
+            saveOutbox(outbox)
+
+            for track in pl.tracks {
+                let addEvent = SyncEventPayload(
+                    id: UUID().uuidString.lowercased(),
+                    action: "UPDATE_PLAYLIST",
+                    timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+                    data: [
+                        "playlistId": AnyCodable(pl.id),
+                        "operation": AnyCodable("ADD_TRACK"),
+                        "track": AnyCodable([
+                            "id": track.id,
+                            "title": track.title,
+                            "artist": track.artist,
+                            "duration": track.durationSeconds,
+                            "thumbnailUrl": track.thumbnailUrl
+                        ])
+                    ]
+                )
+                var currentOutbox = loadOutbox()
+                currentOutbox.append(addEvent)
+                saveOutbox(currentOutbox)
+            }
+        }
+
+        defaults.set(true, forKey: seededKey)
+    }
+
+    func triggerSyncNow(forceSeed: Bool = false) {
+        guard isSyncEnabled else { return }
+        if forceSeed {
+            seedLocalDataToOutbox(force: true)
+        }
+        guard !isSyncing else { return }
         Task {
             await self.syncDelta()
         }
@@ -290,33 +382,55 @@ final class SyncManager: ObservableObject {
     }
 
     private func pushOutbox() async {
-        var outbox = loadOutbox()
-        guard !outbox.isEmpty,
-              !getRelayUrl().isEmpty,
+        guard !getRelayUrl().isEmpty,
               let keys = derivedKeys,
               let vaultId = defaults.string(forKey: kPrefVaultId) else {
             return
         }
 
-        let batch = Array(outbox.prefix(20))
-        guard let jsonData = try? JSONEncoder().encode(batch),
-              let jsonStr = String(data: jsonData, encoding: .utf8) else {
-            return
-        }
+        var loops = 0
+        while loops < 5 {
+            loops += 1
+            var outbox = loadOutbox()
+            guard !outbox.isEmpty else { break }
 
-        do {
-            let ciphertext = try SyncCrypto.encrypt(plaintext: jsonStr, key: keys.encKey)
-            let path = "/api/v1/sync/push"
-            let now = Int64(Date().timeIntervalSince1970 * 1000)
-            let bodyDict: [String: Any] = [
-                "vault_id": vaultId,
-                "ciphertext": ciphertext
-            ]
-            guard let reqBodyData = try? JSONSerialization.data(withJSONObject: bodyDict),
-                  let reqBodyStr = String(data: reqBodyData, encoding: .utf8) else {
-                return
+            let batch = Array(outbox.prefix(50))
+            var eventsPayload: [[String: String]] = []
+            var sentIds = Set<String>()
+
+            for item in batch {
+                let eventDict: [String: Any] = [
+                    "id": item.id,
+                    "device_id": getDeviceId(),
+                    "device_type": "ios",
+                    "timestamp": item.timestamp,
+                    "action": item.action,
+                    "data": item.data.mapValues { $0.value }
+                ]
+                guard let eventData = try? JSONSerialization.data(withJSONObject: eventDict),
+                      let eventJsonStr = String(data: eventData, encoding: .utf8),
+                      let cipher = try? SyncCrypto.encrypt(plaintext: eventJsonStr, key: keys.encKey) else {
+                    continue
+                }
+                eventsPayload.append([
+                    "id": item.id,
+                    "payload_encrypted": cipher
+                ])
+                sentIds.insert(item.id)
             }
 
+            guard !eventsPayload.isEmpty else { break }
+
+            let reqBodyDict: [String: Any] = [
+                "events": eventsPayload
+            ]
+            guard let reqBodyData = try? JSONSerialization.data(withJSONObject: reqBodyDict),
+                  let reqBodyStr = String(data: reqBodyData, encoding: .utf8) else {
+                break
+            }
+
+            let path = "/api/v1/sync/push"
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
             let signature = SyncCrypto.signRequest(
                 authKey: keys.authKey,
                 vaultId: vaultId,
@@ -325,7 +439,7 @@ final class SyncManager: ObservableObject {
             )
 
             let urlStr = "\(getRelayUrl())\(path)"
-            guard let url = URL(string: urlStr) else { return }
+            guard let url = URL(string: urlStr) else { break }
 
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -335,14 +449,20 @@ final class SyncManager: ObservableObject {
             request.setValue(signature, forHTTPHeaderField: "X-Signature")
             request.httpBody = reqBodyData
 
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
-                // Remove synced batch
-                outbox.removeFirst(batch.count)
-                saveOutbox(outbox)
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
+                    outbox.removeAll(where: { sentIds.contains($0.id) })
+                    saveOutbox(outbox)
+                } else {
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                    print("[SyncManager] Push rejected with status \(code)")
+                    break
+                }
+            } catch {
+                print("[SyncManager] Push error: \(error)")
+                break
             }
-        } catch {
-            print("[SyncManager] Push error: \(error)")
         }
     }
 
@@ -355,7 +475,7 @@ final class SyncManager: ObservableObject {
 
         let lastSeq = defaults.integer(forKey: kPrefLastPulledSeq)
         let path = "/api/v1/sync/pull"
-        let fullPathWithQuery = "\(path)?vault_id=\(vaultId)&since_seq=\(lastSeq)&limit=50"
+        let fullPathWithQuery = "\(path)?vault_id=\(vaultId)&since_seq=\(lastSeq)&limit=200"
         let now = Int64(Date().timeIntervalSince1970 * 1000)
 
         let signature = SyncCrypto.signRequest(
@@ -387,11 +507,9 @@ final class SyncManager: ObservableObject {
                 if let seq = ev["seq"] as? Int, seq > maxSeq {
                     maxSeq = seq
                 }
-                if let ciphertext = ev["ciphertext"] as? String {
+                if let ciphertext = (ev["payload_encrypted"] as? String) ?? (ev["ciphertext"] as? String) {
                     if let plaintext = try? SyncCrypto.decrypt(ciphertextBase64: ciphertext, key: keys.encKey) {
-                        DispatchQueue.main.async {
-                            self.applyDecryptedEvents(plaintext)
-                        }
+                        applyDecryptedEvents(plaintext)
                     }
                 }
             }
@@ -404,12 +522,15 @@ final class SyncManager: ObservableObject {
 
     private func applyDecryptedEvents(_ jsonStr: String) {
         guard let data = jsonStr.data(using: .utf8),
-              let list = try? JSONDecoder().decode([SyncEventPayload].self, from: data) else {
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             return
         }
 
-        for item in list {
-            LocalMusicStore.shared.applyRemoteSyncEvent(action: item.action, data: item.data.mapValues { $0.value })
+        let originDevId = dict["device_id"] as? String
+        if originDevId != getDeviceId() {
+            let action = (dict["action"] as? String) ?? ""
+            let eventData = (dict["data"] as? [String: Any]) ?? [:]
+            LocalMusicStore.shared.applyRemoteSyncEvent(action: action, data: eventData)
         }
     }
 

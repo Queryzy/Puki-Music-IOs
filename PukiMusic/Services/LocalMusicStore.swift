@@ -164,22 +164,26 @@ class LocalMusicStore: ObservableObject {
     }
 
     func setFavoriteState(track: Track, isLiked: Bool) {
-        let idx = favorites.firstIndex(where: { $0.id == track.id })
-        if isLiked {
-            if idx == nil {
-                favorites.insert(track, at: 0)
-                saveFavorites()
-            }
-        } else {
-            if let i = idx {
-                favorites.remove(at: i)
-                saveFavorites()
+        let normId = Track.normalizeId(track.id)
+        let idx = favorites.firstIndex(where: { Track.normalizeId($0.id) == normId })
+        DispatchQueue.main.async {
+            if isLiked {
+                if idx == nil {
+                    self.favorites.insert(track, at: 0)
+                    self.saveFavorites()
+                }
+            } else {
+                if let i = idx {
+                    self.favorites.remove(at: i)
+                    self.saveFavorites()
+                }
             }
         }
     }
     
     func isFavorite(trackId: String) -> Bool {
-        favorites.contains(where: { $0.id == trackId })
+        let norm = Track.normalizeId(trackId)
+        return favorites.contains(where: { Track.normalizeId($0.id) == norm })
     }
     
     @discardableResult
@@ -363,7 +367,7 @@ class LocalMusicStore: ObservableObject {
             if let id = data["id"] as? String,
                let title = data["title"] as? String,
                let artist = data["artist"] as? String {
-                let duration = (data["duration"] as? NSNumber)?.int64Value ?? 0
+                let duration = (data["duration"] as? NSNumber)?.int64Value ?? ((data["duration"] as? Int64) ?? 0)
                 let thumb = (data["thumbnailUrl"] as? String) ?? ""
                 let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
                 recordPlay(track: track, fromSync: true)
@@ -374,7 +378,7 @@ class LocalMusicStore: ObservableObject {
                let id = trackDict["id"] as? String,
                let title = trackDict["title"] as? String,
                let artist = trackDict["artist"] as? String {
-                let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? 0
+                let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? ((trackDict["duration"] as? Int64) ?? 0)
                 let thumb = (trackDict["thumbnailUrl"] as? String) ?? ""
                 let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
                 setFavoriteState(track: track, isLiked: isLiked)
@@ -392,7 +396,7 @@ class LocalMusicStore: ObservableObject {
                           let id = trackDict["id"] as? String,
                           let title = trackDict["title"] as? String,
                           let artist = trackDict["artist"] as? String {
-                    let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? 0
+                    let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? ((trackDict["duration"] as? Int64) ?? 0)
                     let thumb = (trackDict["thumbnailUrl"] as? String) ?? ""
                     let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
                     addTrackToPlaylist(playlistId: playlistId, track: track, fromSync: true)

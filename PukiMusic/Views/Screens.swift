@@ -1322,6 +1322,7 @@ struct SettingsTabView: View {
     @State private var showingScannerModal = false
     @State private var customRelayInput = ""
     @State private var currentPairingUri = ""
+    @State private var isManualSyncing = false
     
     private let sideStoreSourceUrl = "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/apps.json"
     
@@ -1534,8 +1535,11 @@ struct SettingsTabView: View {
                                 .foregroundColor(.pukiTextSecondary)
                                 .font(.system(size: 12))
                         }
+                        Spacer()
                     }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(BorderlessButtonStyle())
 
                 Button(action: {
                     showingScannerModal = true
@@ -1551,20 +1555,43 @@ struct SettingsTabView: View {
                                 .foregroundColor(.pukiTextSecondary)
                                 .font(.system(size: 12))
                         }
+                        Spacer()
                     }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(BorderlessButtonStyle())
 
                 if syncManager.isSyncEnabled {
                     Button(action: {
-                        syncManager.triggerSyncNow()
+                        isManualSyncing = true
+                        syncManager.seedLocalDataToOutbox(force: true)
+                        syncManager.triggerSyncNow(forceSeed: true)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            isManualSyncing = false
+                            copyMessage = "Sinkronisasi telemetri berhasil dikirim!"
+                            showingCopyAlert = true
+                        }
                     }) {
                         HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .foregroundColor(.pukiCoral)
-                            Text("Sinkronkan Sekarang")
-                                .foregroundColor(.pukiCoral)
+                            if isManualSyncing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .pukiCoral))
+                                    .scaleEffect(0.8)
+                                Text("Sedang Menyinkronkan...")
+                                    .foregroundColor(.pukiCoral)
+                                    .font(.system(size: 15, weight: .semibold))
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .foregroundColor(.pukiCoral)
+                                Text("Sinkronkan Sekarang")
+                                    .foregroundColor(.pukiCoral)
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+                            Spacer()
                         }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(BorderlessButtonStyle())
 
                     Button(action: {
                         syncManager.disableSync()
@@ -1574,8 +1601,12 @@ struct SettingsTabView: View {
                                 .foregroundColor(.red)
                             Text("Putuskan Sambungan Sync")
                                 .foregroundColor(.red)
+                                .font(.system(size: 15))
+                            Spacer()
                         }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(BorderlessButtonStyle())
                 }
             }
             .listRowBackground(Color.pukiCard)
@@ -1941,11 +1972,23 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.32 Card
+                        releaseCard(
+                            version: "v1.0.32 (Build 32)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Fix 1:1 Full Sync & Outbox Flush: Selaras format payload push/pull relay server Cloudflare Workers.",
+                                "Full State Seeding: Otomatis seed seluruh database lokal (lagu favorit lama, recent searches, playlist) ke relay saat pairing / tombol Sinkronkan ditekan.",
+                                "Fix Tombol Sinkronkan Sekarang: Perbaikan touch hit area SwiftUI List (.borderless) dan indikator progress saat sync."
+                            ]
+                        )
+
                         // v1.0.31 Card
                         releaseCard(
                             version: "v1.0.31 (Build 31)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "STABIL",
                             changes: [
                                 "Fix URI Query Parser: Dukung parameter url dan relay secara universal untuk pairing QR Android & iOS.",
                                 "Fix Crash Scanner Kamera: Injeksi NSCameraUsageDescription pada Info.plist & izin defensif."

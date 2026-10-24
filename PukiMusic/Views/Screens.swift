@@ -1825,6 +1825,46 @@ class ScannerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        checkCameraPermission()
+    }
+
+    private func checkCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            setupCaptureSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.setupCaptureSession()
+                    } else {
+                        self?.showPermissionDeniedMessage()
+                    }
+                }
+            }
+        default:
+            showPermissionDeniedMessage()
+        }
+    }
+
+    private func showPermissionDeniedMessage() {
+        let label = UILabel()
+        label.text = "Izin kamera diperlukan untuk scan QR.\nBuka Pengaturan iOS > Puki Music > Kamera untuk mengaktifkan izin."
+        label.textColor = .lightGray
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
+            label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32)
+        ])
+    }
+
+    private func setupCaptureSession() {
         let session = AVCaptureSession()
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video),
               let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice),
@@ -1901,11 +1941,22 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.30 Card
+                        releaseCard(
+                            version: "v1.0.30 (Build 30)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Fix Crash Scanner Kamera: Injeksi NSCameraUsageDescription pada Info.plist IPA bundle & pengecekan izin kamera defensif.",
+                                "Fix HMAC Signature & Auth Key: Sinkronisasi otentikasi relay dengan Cloudflare D1."
+                            ]
+                        )
+
                         // v1.0.29 Card
                         releaseCard(
                             version: "v1.0.29 (Build 29)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "STABIL",
                             changes: [
                                 "Fix HMAC Signature & Auth Key: Sinkronisasi otentikasi relay dengan Cloudflare D1.",
                                 "E2EE Sync Parity: Sinkronisasi dua arah real-time play history, recent search, favorites, dan playlist dengan Android."

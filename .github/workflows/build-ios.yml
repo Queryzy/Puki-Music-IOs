@@ -48,9 +48,10 @@ jobs:
           mkdir -p build/Payload
           cp -r build/PukiMusic.xcarchive/Products/Applications/PukiMusic.app build/Payload/
           
-          # Force Plist to exact target version so SideStore parser matches 100%
+          # Force Plist to exact target version and permissions so SideStore parser & Camera access match 100%
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" build/Payload/PukiMusic.app/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${VERSION}" build/Payload/PukiMusic.app/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" build/Payload/PukiMusic.app/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD}" build/Payload/PukiMusic.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Kamera digunakan untuk memindai kode QR sinkronisasi antar-perangkat Puki Music.'" build/Payload/PukiMusic.app/Info.plist || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'Kamera digunakan untuk memindai kode QR sinkronisasi antar-perangkat Puki Music.'" build/Payload/PukiMusic.app/Info.plist
           
           cd build && zip -r Puki-Music.ipa Payload
           echo "IPA Build complete: build/Puki-Music.ipa"

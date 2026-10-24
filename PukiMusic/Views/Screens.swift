@@ -1901,11 +1901,22 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.29 Card
+                        releaseCard(
+                            version: "v1.0.29 (Build 29)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Fix HMAC Signature & Auth Key: Sinkronisasi otentikasi relay dengan Cloudflare D1.",
+                                "E2EE Sync Parity: Sinkronisasi dua arah real-time play history, recent search, favorites, dan playlist dengan Android."
+                            ]
+                        )
+
                         // v1.0.28 Card
                         releaseCard(
                             version: "v1.0.28 (Build 28)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "STABIL",
                             changes: [
                                 "Sinkronisasi Telemetri Lintas-Platform: Riwayat pencarian, lagu diputar, favorit, dan playlist otomatis sinkron dengan Android & Desktop.",
                                 "Zero-Knowledge E2EE Relay: Enkripsi client-side AES-256-GCM via CryptoKit; server tidak bisa melihat data pengguna.",

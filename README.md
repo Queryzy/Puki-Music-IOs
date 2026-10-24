@@ -4,6 +4,7 @@
 
 ![Puki Music iOS](https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/PukiMusic/Assets.xcassets/AppLogo.imageset/app_logo.png)
 
+### **P.U.K.I.** — *Pure Unlimited Kinetic Interface*
 **Native iOS Music Streaming Player (SwiftUI, AVPlayer, Midnight Glow UI & Zero-Knowledge E2EE Cross-Device Sync)**
 
 [![Platform](https://img.shields.io/badge/Platform-iOS_16.0+-blue.svg)](https://apple.com/ios)

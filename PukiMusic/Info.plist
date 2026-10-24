@@ -17,9 +17,9 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.27</string>
+    <string>1.0.28</string>
     <key>CFBundleVersion</key>
-    <string>27</string>
+    <string>28</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UIBackgroundModes</key>
@@ -38,5 +38,7 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Kamera digunakan untuk memindai kode QR sinkronisasi antar-perangkat Puki Music.</string>
 </dict>
 </plist>

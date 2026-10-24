@@ -75,7 +75,7 @@ class LocalMusicStore: ObservableObject {
         }
     }
     
-    func addRecentSearch(_ term: String) {
+    func addRecentSearch(_ term: String, fromSync: Bool = false) {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         var list = recentSearches
@@ -86,6 +86,10 @@ class LocalMusicStore: ObservableObject {
         }
         self.recentSearches = list
         userDefaults.set(list, forKey: keyRecentSearches)
+
+        if !fromSync {
+            SyncManager.shared.queueEvent(action: "ADD_SEARCH", data: ["query": trimmed])
+        }
     }
     
     func clearRecentSearches() {
@@ -93,7 +97,7 @@ class LocalMusicStore: ObservableObject {
         userDefaults.removeObject(forKey: keyRecentSearches)
     }
     
-    func recordPlay(track: Track) {
+    func recordPlay(track: Track, fromSync: Bool = false) {
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         if let idx = playHistory.firstIndex(where: { $0.id == track.id }) {
             playHistory[idx].playCount += 1
@@ -121,27 +125,82 @@ class LocalMusicStore: ObservableObject {
             playHistory = Array(playHistory.prefix(50))
         }
         savePlayHistory()
+
+        if !fromSync {
+            SyncManager.shared.queueEvent(action: "RECORD_PLAY", data: [
+                "id": track.id,
+                "title": track.title,
+                "artist": track.artist,
+                "duration": track.durationSeconds,
+                "thumbnailUrl": track.thumbnailUrl,
+                "playedAt": now
+            ])
+        }
     }
     
-    func toggleFavorite(track: Track) {
+    func toggleFavorite(track: Track, fromSync: Bool = false) {
+        var isNowFav = false
         if let idx = favorites.firstIndex(where: { $0.id == track.id }) {
             favorites.remove(at: idx)
+            isNowFav = false
         } else {
-            favorites.append(track)
+            favorites.insert(track, at: 0)
+            isNowFav = true
         }
         saveFavorites()
+
+        if !fromSync {
+            SyncManager.shared.queueEvent(action: "TOGGLE_FAVORITE", data: [
+                "isLiked": isNowFav,
+                "track": [
+                    "id": track.id,
+                    "title": track.title,
+                    "artist": track.artist,
+                    "duration": track.durationSeconds,
+                    "thumbnailUrl": track.thumbnailUrl
+                ]
+            ])
+        }
+    }
+
+    func setFavoriteState(track: Track, isLiked: Bool) {
+        let idx = favorites.firstIndex(where: { $0.id == track.id })
+        if isLiked {
+            if idx == nil {
+                favorites.insert(track, at: 0)
+                saveFavorites()
+            }
+        } else {
+            if let i = idx {
+                favorites.remove(at: i)
+                saveFavorites()
+            }
+        }
     }
     
     func isFavorite(trackId: String) -> Bool {
         favorites.contains(where: { $0.id == trackId })
     }
     
-    func createPlaylist(name: String) {
+    @discardableResult
+    func createPlaylist(id: String = UUID().uuidString, name: String, fromSync: Bool = false) -> Playlist? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let newPl = Playlist(id: UUID().uuidString, name: trimmed, tracks: [])
+        guard !trimmed.isEmpty else { return nil }
+        if let existing = playlists.first(where: { $0.id == id || $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            return existing
+        }
+        let newPl = Playlist(id: id, name: trimmed, tracks: [])
         playlists.append(newPl)
         savePlaylists()
+
+        if !fromSync {
+            SyncManager.shared.queueEvent(action: "UPDATE_PLAYLIST", data: [
+                "playlistId": id,
+                "name": trimmed,
+                "operation": "CREATE"
+            ])
+        }
+        return newPl
     }
     
     func deletePlaylist(id: String) {
@@ -275,12 +334,72 @@ class LocalMusicStore: ObservableObject {
         return sections
     }
     
-    func addTrackToPlaylist(playlistId: String, track: Track) {
+    func addTrackToPlaylist(playlistId: String, track: Track, fromSync: Bool = false) {
         if let idx = playlists.firstIndex(where: { $0.id == playlistId }) {
             if !playlists[idx].tracks.contains(where: { $0.id == track.id }) {
                 playlists[idx].tracks.append(track)
                 savePlaylists()
+
+                if !fromSync {
+                    SyncManager.shared.queueEvent(action: "UPDATE_PLAYLIST", data: [
+                        "playlistId": playlistId,
+                        "operation": "ADD_TRACK",
+                        "track": [
+                            "id": track.id,
+                            "title": track.title,
+                            "artist": track.artist,
+                            "duration": track.durationSeconds,
+                            "thumbnailUrl": track.thumbnailUrl
+                        ]
+                    ])
+                }
             }
+        }
+    }
+
+    func applyRemoteSyncEvent(action: String, data: [String: Any]) {
+        switch action {
+        case "RECORD_PLAY":
+            if let id = data["id"] as? String,
+               let title = data["title"] as? String,
+               let artist = data["artist"] as? String {
+                let duration = (data["duration"] as? NSNumber)?.int64Value ?? 0
+                let thumb = (data["thumbnailUrl"] as? String) ?? ""
+                let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
+                recordPlay(track: track, fromSync: true)
+            }
+        case "TOGGLE_FAVORITE":
+            let isLiked = (data["isLiked"] as? Bool) ?? true
+            if let trackDict = data["track"] as? [String: Any],
+               let id = trackDict["id"] as? String,
+               let title = trackDict["title"] as? String,
+               let artist = trackDict["artist"] as? String {
+                let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? 0
+                let thumb = (trackDict["thumbnailUrl"] as? String) ?? ""
+                let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
+                setFavoriteState(track: track, isLiked: isLiked)
+            }
+        case "ADD_SEARCH":
+            if let query = data["query"] as? String, !query.isEmpty {
+                addRecentSearch(query, fromSync: true)
+            }
+        case "UPDATE_PLAYLIST":
+            if let playlistId = data["playlistId"] as? String {
+                let op = (data["operation"] as? String) ?? ""
+                if op == "CREATE", let name = data["name"] as? String {
+                    createPlaylist(id: playlistId, name: name, fromSync: true)
+                } else if op == "ADD_TRACK", let trackDict = data["track"] as? [String: Any],
+                          let id = trackDict["id"] as? String,
+                          let title = trackDict["title"] as? String,
+                          let artist = trackDict["artist"] as? String {
+                    let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? 0
+                    let thumb = (trackDict["thumbnailUrl"] as? String) ?? ""
+                    let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
+                    addTrackToPlaylist(playlistId: playlistId, track: track, fromSync: true)
+                }
+            }
+        default:
+            break
         }
     }
     

@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import CoreImage.CIFilterBuiltins
 
 struct HomeDashboardView: View {
     @EnvironmentObject var playerManager: AudioPlayerManager
@@ -1305,6 +1307,7 @@ struct PlaylistDetailSheetView: View {
 // MARK: - Settings Tab
 struct SettingsTabView: View {
     @ObservedObject var store = LocalMusicStore.shared
+    @ObservedObject var syncManager = SyncManager.shared
     @State private var showingFilePicker = false
     @State private var showingExportSheet = false
     @State private var showingChangelog = false
@@ -1315,6 +1318,9 @@ struct SettingsTabView: View {
     @State private var importMessage: String = ""
     @State private var showingAlert = false
     @State private var storageMB: Double = 0.0
+    @State private var showingQrModal = false
+    @State private var showingScannerModal = false
+    @State private var currentPairingUri = ""
     
     private let sideStoreSourceUrl = "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/apps.json"
     
@@ -1456,6 +1462,95 @@ struct SettingsTabView: View {
                 .tint(.pukiCoral)
             }
             .listRowBackground(Color.pukiCard)
+
+            Section(header: Text("SINKRONISASI TELEMETRI (CROSS-DEVICE E2EE)").foregroundColor(.pukiTextSecondary)) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Cloud Relay (Zero-Knowledge)")
+                            .foregroundColor(.white)
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(syncManager.getRelayUrl())
+                            .foregroundColor(.pukiTextSecondary)
+                            .font(.system(size: 11, design: .monospaced))
+                    }
+                    Spacer()
+                    if syncManager.isSyncEnabled {
+                        Text("● TERHUBUNG")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.green)
+                    } else {
+                        Text("○ NONAKTIF")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.pukiTextSecondary)
+                    }
+                }
+
+                Button(action: {
+                    do {
+                        let uri = syncManager.isSyncEnabled ? syncManager.getPairingUri() : try syncManager.initializeNewVault()
+                        currentPairingUri = uri
+                        showingQrModal = true
+                    } catch {
+                        copyMessage = "Gagal inisialisasi sync: \(error.localizedDescription)"
+                        showingCopyAlert = true
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "qrcode")
+                            .foregroundColor(.pukiCoral)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Tampilkan QR Pairing")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15))
+                            Text("Buka kamera di Android/PC untuk menyambungkan")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
+                }
+
+                Button(action: {
+                    showingScannerModal = true
+                }) {
+                    HStack {
+                        Image(systemName: "qrcode.viewfinder")
+                            .foregroundColor(.pukiAmber)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Scan QR Perangkat Lain")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15))
+                            Text("Pindai QR dari HP Android atau iOS lain")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
+                }
+
+                if syncManager.isSyncEnabled {
+                    Button(action: {
+                        syncManager.triggerSyncNow()
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(.pukiCoral)
+                            Text("Sinkronkan Sekarang")
+                                .foregroundColor(.pukiCoral)
+                        }
+                    }
+
+                    Button(action: {
+                        syncManager.disableSync()
+                    }) {
+                        HStack {
+                            Image(systemName: "xmark.circle")
+                                .foregroundColor(.red)
+                            Text("Putuskan Sambungan Sync")
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+            }
+            .listRowBackground(Color.pukiCard)
             
             Section(header: Text("MIGRASI DATA ANTAR-EKOSISTEM").foregroundColor(.pukiTextSecondary)) {
                 Button(action: {
@@ -1549,6 +1644,195 @@ struct SettingsTabView: View {
         .sheet(isPresented: $showingExportSheet) {
             ShareSheet(activityItems: [exportText])
         }
+        .sheet(isPresented: $showingQrModal) {
+            ZStack {
+                Color.pukiBackground.ignoresSafeArea()
+                VStack(spacing: 20) {
+                    Text("QR Sinkronisasi Antar-Perangkat")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.top, 24)
+
+                    Text("Scan menggunakan kamera Puki Music di Android atau iPhone lain untuk menghubungkan sinkronisasi.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.pukiTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+
+                    QRCodeView(content: currentPairingUri)
+                        .padding()
+
+                    Button(action: {
+                        UIPasteboard.general.string = currentPairingUri
+                        copyMessage = "Link pairing disalin ke clipboard!"
+                        showingCopyAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "doc.on.doc.fill")
+                            Text("SALIN LINK PAIRING")
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.black)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 24)
+                        .background(Color.pukiCoral)
+                        .cornerRadius(8)
+                    }
+
+                    Button("Tutup") {
+                        showingQrModal = false
+                    }
+                    .foregroundColor(.pukiTextSecondary)
+                    .padding(.top, 8)
+
+                    Spacer()
+                }
+            }
+        }
+        .sheet(isPresented: $showingScannerModal) {
+            ZStack(alignment: .topTrailing) {
+                QRScannerView(
+                    onScanned: { scannedText in
+                        showingScannerModal = false
+                        let success = syncManager.parseAndApplyPairingUri(scannedText)
+                        if success {
+                            copyMessage = "Berhasil menghubungkan perangkat! Sinkronisasi telemetri aktif."
+                        } else {
+                            copyMessage = "Format QR Code tidak dikenali sebagai Puki Music Sync."
+                        }
+                        showingCopyAlert = true
+                    },
+                    onCancel: {
+                        showingScannerModal = false
+                    }
+                )
+                .ignoresSafeArea()
+
+                Button(action: { showingScannerModal = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(.white)
+                        .padding()
+                }
+            }
+        }
+    }
+}
+
+struct QRCodeView: View {
+    let content: String
+    
+    var body: some View {
+        if let image = generateQRCode(from: content) {
+            Image(uiImage: image)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 220, height: 220)
+                .background(Color.white)
+                .cornerRadius(12)
+        } else {
+            Rectangle()
+                .fill(Color.gray)
+                .frame(width: 220, height: 220)
+        }
+    }
+    
+    private func generateQRCode(from string: String) -> UIImage? {
+        let data = Data(string.utf8)
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
+        let scaledImage = output.transformed(by: transform)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+}
+
+struct QRScannerView: UIViewControllerRepresentable {
+    var onScanned: (String) -> Void
+    var onCancel: () -> Void
+
+    func makeUIViewController(context: Context) -> ScannerViewController {
+        let controller = ScannerViewController()
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: ScannerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onScanned: onScanned, onCancel: onCancel)
+    }
+
+    class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+        let onScanned: (String) -> Void
+        let onCancel: () -> Void
+        var didScan = false
+
+        init(onScanned: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+            self.onScanned = onScanned
+            self.onCancel = onCancel
+        }
+
+        func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+            guard !didScan, let metadataObject = metadataObjects.first,
+                  let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
+                  let stringValue = readableObject.stringValue else { return }
+            didScan = true
+            AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
+            onScanned(stringValue)
+        }
+    }
+}
+
+class ScannerViewController: UIViewController {
+    var captureSession: AVCaptureSession?
+    var previewLayer: AVCaptureVideoPreviewLayer?
+    weak var delegate: AVCaptureMetadataOutputObjectsDelegate?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        let session = AVCaptureSession()
+        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video),
+              let videoInput = try? AVCaptureDeviceInput(device: videoCaptureDevice),
+              session.canAddInput(videoInput) else {
+            return
+        }
+        session.addInput(videoInput)
+        let metadataOutput = AVCaptureMetadataOutput()
+        if session.canAddOutput(metadataOutput) {
+            session.addOutput(metadataOutput)
+            if let delegate = delegate {
+                metadataOutput.setMetadataObjectsDelegate(delegate, queue: DispatchQueue.main)
+                metadataOutput.metadataObjectTypes = [.qr]
+            }
+        }
+        let preview = AVCaptureVideoPreviewLayer(session: session)
+        preview.frame = view.layer.bounds
+        preview.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(preview)
+        self.previewLayer = preview
+        self.captureSession = session
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.startRunning()
+        }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.layer.bounds
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        if captureSession?.isRunning == true {
+            captureSession?.stopRunning()
+        }
     }
 }
 
@@ -1589,11 +1873,24 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.28 Card
+                        releaseCard(
+                            version: "v1.0.28 (Build 28)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Sinkronisasi Telemetri Lintas-Platform: Riwayat pencarian, lagu diputar, favorit, dan playlist otomatis sinkron dengan Android & Desktop.",
+                                "Zero-Knowledge E2EE Relay: Enkripsi client-side AES-256-GCM via CryptoKit; server tidak bisa melihat data pengguna.",
+                                "One-Tap QR Pairing & Scanner: Sambungkan perangkat cukup dengan scan QR via kamera atau copy-paste URI.",
+                                "Non-Destructive Delta Merging: Menggabungkan data multi-device tanpa risiko saling menimpa."
+                            ]
+                        )
+
                         // v1.0.27 Card
                         releaseCard(
                             version: "v1.0.27 (Build 27)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "PREVIOUS",
                             changes: [
                                 "Sinkronisasi Changelog Dinamis: Changelog kini selalu selaras dengan versi aktif aplikasi.",
                                 "Automated SHA-256 Pipeline: Verifikasi kriptografis otomatis pada setiap rilis SideStore repository."

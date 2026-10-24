@@ -1320,7 +1320,6 @@ struct SettingsTabView: View {
     @State private var storageMB: Double = 0.0
     @State private var showingQrModal = false
     @State private var showingScannerModal = false
-    @State private var showingEditRelayAlert = false
     @State private var customRelayInput = ""
     @State private var currentPairingUri = ""
     
@@ -1487,20 +1486,30 @@ struct SettingsTabView: View {
                     }
                 }
 
-                Button(action: {
-                    customRelayInput = syncManager.getRelayUrl()
-                    showingEditRelayAlert = true
-                }) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("URL RELAY SERVER")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.pukiTextSecondary)
                     HStack {
-                        Image(systemName: "server.rack")
-                            .foregroundColor(.pukiAmber)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Ubah Relay Server")
-                                .foregroundColor(.white)
-                                .font(.system(size: 15))
-                            Text("Default: puki-sync.diylabs.top (atau IP/Domain sendiri)")
-                                .foregroundColor(.pukiTextSecondary)
-                                .font(.system(size: 12))
+                        TextField("https://...", text: Binding(
+                            get: { customRelayInput.isEmpty ? syncManager.getRelayUrl() : customRelayInput },
+                            set: {
+                                customRelayInput = $0
+                                syncManager.setRelayUrl($0)
+                            }
+                        ))
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(.white)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+
+                        if customRelayInput != "https://puki-sync.diylabs.top" && !customRelayInput.isEmpty {
+                            Button("DEFAULT") {
+                                customRelayInput = "https://puki-sync.diylabs.top"
+                                syncManager.setRelayUrl(customRelayInput)
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.pukiCoral)
                         }
                     }
                 }
@@ -1660,18 +1669,6 @@ struct SettingsTabView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(copyMessage)
-        }
-        .alert("Konfigurasi Relay Server", isPresented: $showingEditRelayAlert) {
-            TextField("https://...", text: $customRelayInput)
-            Button("Simpan") {
-                syncManager.setRelayUrl(customRelayInput)
-            }
-            Button("Reset Default") {
-                syncManager.setRelayUrl("")
-            }
-            Button("Batal", role: .cancel) { }
-        } message: {
-            Text("Masukkan URL relay server jika self-hosted (misal: Docker di LAN atau Cloudflare Worker sendiri).")
         }
         .sheet(isPresented: $showingExportSheet) {
             ShareSheet(activityItems: [exportText])

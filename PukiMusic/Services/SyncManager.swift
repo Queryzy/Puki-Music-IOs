@@ -134,6 +134,16 @@ final class SyncManager: ObservableObject {
         defaults.set(clean, forKey: kPrefRelayUrl)
     }
 
+    func getDeviceId() -> String {
+        let key = "kPrefSyncDeviceId"
+        if let id = defaults.string(forKey: key), !id.isEmpty {
+            return id
+        }
+        let newId = UIDevice.current.identifierForVendor?.uuidString.lowercased() ?? UUID().uuidString.lowercased()
+        defaults.set(newId, forKey: key)
+        return newId
+    }
+
     func getPairingUri() -> String {
         guard let vaultId = defaults.string(forKey: kPrefVaultId),
               let secret = defaults.string(forKey: kPrefSyncSecret) else {

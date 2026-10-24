@@ -1320,6 +1320,8 @@ struct SettingsTabView: View {
     @State private var storageMB: Double = 0.0
     @State private var showingQrModal = false
     @State private var showingScannerModal = false
+    @State private var showingEditRelayAlert = false
+    @State private var customRelayInput = ""
     @State private var currentPairingUri = ""
     
     private let sideStoreSourceUrl = "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/apps.json"
@@ -1486,6 +1488,24 @@ struct SettingsTabView: View {
                 }
 
                 Button(action: {
+                    customRelayInput = syncManager.getRelayUrl()
+                    showingEditRelayAlert = true
+                }) {
+                    HStack {
+                        Image(systemName: "server.rack")
+                            .foregroundColor(.pukiAmber)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Ubah Relay Server")
+                                .foregroundColor(.white)
+                                .font(.system(size: 15))
+                            Text("Default: puki-sync.diylabs.top (atau IP/Domain sendiri)")
+                                .foregroundColor(.pukiTextSecondary)
+                                .font(.system(size: 12))
+                        }
+                    }
+                }
+
+                Button(action: {
                     do {
                         let uri = syncManager.isSyncEnabled ? syncManager.getPairingUri() : try syncManager.initializeNewVault()
                         currentPairingUri = uri
@@ -1640,6 +1660,18 @@ struct SettingsTabView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(copyMessage)
+        }
+        .alert("Konfigurasi Relay Server", isPresented: $showingEditRelayAlert) {
+            TextField("https://...", text: $customRelayInput)
+            Button("Simpan") {
+                syncManager.setRelayUrl(customRelayInput)
+            }
+            Button("Reset Default") {
+                syncManager.setRelayUrl("")
+            }
+            Button("Batal", role: .cancel) { }
+        } message: {
+            Text("Masukkan URL relay server jika self-hosted (misal: Docker di LAN atau Cloudflare Worker sendiri).")
         }
         .sheet(isPresented: $showingExportSheet) {
             ShareSheet(activityItems: [exportText])

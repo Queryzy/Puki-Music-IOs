@@ -128,6 +128,11 @@ final class SyncManager: ObservableObject {
         return defaults.string(forKey: kPrefRelayUrl) ?? defaultRelayUrl
     }
 
+    func setRelayUrl(_ url: String) {
+        let clean = url.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        defaults.set(clean.isEmpty ? defaultRelayUrl : clean, forKey: kPrefRelayUrl)
+    }
+
     func getPairingUri() -> String {
         guard let vaultId = defaults.string(forKey: kPrefVaultId),
               let secret = defaults.string(forKey: kPrefSyncSecret) else {

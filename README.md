@@ -74,7 +74,7 @@ Repository ini dilengkapi pipeline otomatis **GitHub Actions** (`.github/workflo
 
 ## ⚙️ Cara Menghubungkan Sinkronisasi (Pairing)
 1. Buka tab **Pengaturan** di Puki Music iOS.
-2. Pada bagian **Sinkronisasi Antar-Perangkat**, masukkan URL Relay (contoh: `https://puki-sync.diylabs.top` atau self-hosted Anda).
+2. Pada bagian **Sinkronisasi Antar-Perangkat**, masukkan URL Relay (contoh: `https://sync.example.com` atau relay Anda).
 3. Jika menghubungkan dari Android:
    * Tekan tombol **Pindai QR**.
    * Arahkan kamera iPhone ke QR Code yang ditampilkan di layar Android.

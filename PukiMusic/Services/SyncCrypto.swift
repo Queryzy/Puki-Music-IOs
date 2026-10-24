@@ -35,8 +35,7 @@ final class SyncCrypto {
         let encKey = SymmetricKey(data: Data(kEncMac))
         let authKey = SymmetricKey(data: Data(kAuthMac))
 
-        let authVerifierDigest = SHA256.hash(data: Data(kAuthMac))
-        let authVerifierHex = authVerifierDigest.map { String(format: "%02x", $0) }.joined()
+        let authVerifierHex = Data(kAuthMac).map { String(format: "%02x", $0) }.joined()
 
         return SyncDerivedKeys(encKey: encKey, authKey: authKey, authVerifierHex: authVerifierHex)
     }
@@ -62,11 +61,8 @@ final class SyncCrypto {
         return str
     }
 
-    static func signRequest(authKey: SymmetricKey, method: String, path: String, timestamp: Int64, body: String) -> String {
-        var signInput = "\(method.uppercased()):\(path):\(timestamp)"
-        if !body.isEmpty {
-            signInput += ":\(body)"
-        }
+    static func signRequest(authKey: SymmetricKey, vaultId: String, timestamp: Int64, body: String) -> String {
+        let signInput = "\(vaultId):\(timestamp):\(body)"
         let signature = HMAC<SHA256>.authenticationCode(for: Data(signInput.utf8), using: authKey)
         return signature.map { String(format: "%02x", $0) }.joined()
     }

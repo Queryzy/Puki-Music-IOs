@@ -315,8 +315,7 @@ final class SyncManager: ObservableObject {
 
             let signature = SyncCrypto.signRequest(
                 authKey: keys.authKey,
-                method: "POST",
-                path: path,
+                vaultId: vaultId,
                 timestamp: now,
                 body: reqBodyStr
             )
@@ -357,8 +356,7 @@ final class SyncManager: ObservableObject {
 
         let signature = SyncCrypto.signRequest(
             authKey: keys.authKey,
-            method: "GET",
-            path: path,
+            vaultId: vaultId,
             timestamp: now,
             body: ""
         )

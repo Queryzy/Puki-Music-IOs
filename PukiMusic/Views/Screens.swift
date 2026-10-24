@@ -1941,11 +1941,22 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.31 Card
+                        releaseCard(
+                            version: "v1.0.31 (Build 31)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Fix URI Query Parser: Dukung parameter url dan relay secara universal untuk pairing QR Android & iOS.",
+                                "Fix Crash Scanner Kamera: Injeksi NSCameraUsageDescription pada Info.plist & izin defensif."
+                            ]
+                        )
+
                         // v1.0.30 Card
                         releaseCard(
                             version: "v1.0.30 (Build 30)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "STABIL",
                             changes: [
                                 "Fix Crash Scanner Kamera: Injeksi NSCameraUsageDescription pada Info.plist IPA bundle & pengecekan izin kamera defensif.",
                                 "Fix HMAC Signature & Auth Key: Sinkronisasi otentikasi relay dengan Cloudflare D1."

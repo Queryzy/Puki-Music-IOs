@@ -140,7 +140,8 @@ final class SyncManager: ObservableObject {
             return ""
         }
         let relay = getRelayUrl()
-        return "puki://sync?relay=\(relay.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? relay)&vault=\(vaultId)&key=\(secret)"
+        let encodedRelay = relay.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? relay
+        return "puki://sync?url=\(encodedRelay)&relay=\(encodedRelay)&vault=\(vaultId)&key=\(secret)"
     }
 
     func initializeNewVault(customUrl: String? = nil) throws -> String {
@@ -172,11 +173,13 @@ final class SyncManager: ObservableObject {
     }
 
     func parseAndApplyPairingUri(_ uriString: String) -> Bool {
-        guard let url = URL(string: uriString), url.scheme == "puki", url.host == "sync" else {
+        let trimmed = uriString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = URLComponents(string: trimmed),
+              components.scheme?.lowercased() == "puki",
+              components.host?.lowercased() == "sync" else {
             return false
         }
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems else {
+        guard let queryItems = components.queryItems else {
             return false
         }
 
@@ -185,9 +188,10 @@ final class SyncManager: ObservableObject {
         var relay: String?
 
         for item in queryItems {
-            if item.name == "vault" { vaultId = item.value }
-            if item.name == "key" { secret = item.value }
-            if item.name == "relay" { relay = item.value }
+            let name = item.name.lowercased()
+            if name == "vault" { vaultId = item.value }
+            if name == "key" { secret = item.value }
+            if name == "relay" || name == "url" { relay = item.value }
         }
 
         guard let vId = vaultId, !vId.isEmpty,

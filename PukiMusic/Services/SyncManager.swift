@@ -77,7 +77,7 @@ final class SyncManager: ObservableObject {
     private let kPrefLastPulledSeq = "puki_sync_last_seq"
     private let kPrefOutbox = "puki_sync_outbox"
 
-    private let defaultRelayUrl = "https://puki-sync.diylabs.top"
+    private let defaultRelayUrl = ""
 
     @Published var isSyncEnabled: Bool = false
     @Published var connectionState: SyncConnectionState = .disconnected
@@ -97,7 +97,8 @@ final class SyncManager: ObservableObject {
     private func loadSettings() {
         let vaultId = defaults.string(forKey: kPrefVaultId) ?? ""
         let secret = defaults.string(forKey: kPrefSyncSecret) ?? ""
-        if !vaultId.isEmpty && !secret.isEmpty {
+        let relay = defaults.string(forKey: kPrefRelayUrl) ?? ""
+        if !vaultId.isEmpty && !secret.isEmpty && !relay.isEmpty {
             self.currentVaultId = vaultId
             do {
                 self.derivedKeys = try SyncCrypto.deriveKeys(syncSecretHex: secret)
@@ -125,12 +126,12 @@ final class SyncManager: ObservableObject {
     }
 
     func getRelayUrl() -> String {
-        return defaults.string(forKey: kPrefRelayUrl) ?? defaultRelayUrl
+        return defaults.string(forKey: kPrefRelayUrl) ?? ""
     }
 
     func setRelayUrl(_ url: String) {
         let clean = url.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        defaults.set(clean.isEmpty ? defaultRelayUrl : clean, forKey: kPrefRelayUrl)
+        defaults.set(clean, forKey: kPrefRelayUrl)
     }
 
     func getPairingUri() -> String {
@@ -142,14 +143,18 @@ final class SyncManager: ObservableObject {
         return "puki://sync?relay=\(relay.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? relay)&vault=\(vaultId)&key=\(secret)"
     }
 
-    func initializeNewVault() throws -> String {
+    func initializeNewVault(customUrl: String? = nil) throws -> String {
+        let targetRelay = (customUrl ?? getRelayUrl()).trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !targetRelay.isEmpty else {
+            throw NSError(domain: "PukiSync", code: 400, userInfo: [NSLocalizedDescriptionKey: "URL Relay belum diisi! Silakan masukkan URL relay server terlebih dahulu."])
+        }
         let newVaultId = UUID().uuidString.lowercased()
         let newSecret = SyncCrypto.generateSyncSecret()
         let keys = try SyncCrypto.deriveKeys(syncSecretHex: newSecret)
 
         defaults.set(newVaultId, forKey: kPrefVaultId)
         defaults.set(newSecret, forKey: kPrefSyncSecret)
-        defaults.set(defaultRelayUrl, forKey: kPrefRelayUrl)
+        defaults.set(targetRelay, forKey: kPrefRelayUrl)
         defaults.set(0, forKey: kPrefLastPulledSeq)
 
         self.currentVaultId = newVaultId
@@ -190,7 +195,11 @@ final class SyncManager: ObservableObject {
             return false
         }
 
-        let targetRelay = relay ?? defaultRelayUrl
+        let targetRelay = (relay ?? getRelayUrl()).trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !targetRelay.isEmpty else {
+            return false
+        }
+
         do {
             let keys = try SyncCrypto.deriveKeys(syncSecretHex: sec)
             defaults.set(vId, forKey: kPrefVaultId)
@@ -279,6 +288,7 @@ final class SyncManager: ObservableObject {
     private func pushOutbox() async {
         var outbox = loadOutbox()
         guard !outbox.isEmpty,
+              !getRelayUrl().isEmpty,
               let keys = derivedKeys,
               let vaultId = defaults.string(forKey: kPrefVaultId) else {
             return
@@ -334,7 +344,8 @@ final class SyncManager: ObservableObject {
     }
 
     private func pullRemoteDelta() async {
-        guard let keys = derivedKeys,
+        guard !getRelayUrl().isEmpty,
+              let keys = derivedKeys,
               let vaultId = defaults.string(forKey: kPrefVaultId) else {
             return
         }

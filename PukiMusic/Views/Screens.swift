@@ -1475,7 +1475,11 @@ struct SettingsTabView: View {
                             .font(.system(size: 11, design: .monospaced))
                     }
                     Spacer()
-                    if syncManager.isSyncEnabled {
+                    if syncManager.getRelayUrl().isEmpty {
+                        Text("○ BELUM DIKONFIGURASI")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.pukiTextSecondary)
+                    } else if syncManager.isSyncEnabled {
                         Text("● TERHUBUNG")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.green)
@@ -1490,31 +1494,26 @@ struct SettingsTabView: View {
                     Text("URL RELAY SERVER")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.pukiTextSecondary)
-                    HStack {
-                        TextField("https://...", text: Binding(
-                            get: { customRelayInput.isEmpty ? syncManager.getRelayUrl() : customRelayInput },
-                            set: {
-                                customRelayInput = $0
-                                syncManager.setRelayUrl($0)
-                            }
-                        ))
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundColor(.white)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-
-                        if customRelayInput != "https://puki-sync.diylabs.top" && !customRelayInput.isEmpty {
-                            Button("DEFAULT") {
-                                customRelayInput = "https://puki-sync.diylabs.top"
-                                syncManager.setRelayUrl(customRelayInput)
-                            }
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.pukiCoral)
+                    TextField("https://sync.domain.top atau http://192.168.x.x:8080", text: Binding(
+                        get: { customRelayInput.isEmpty ? syncManager.getRelayUrl() : customRelayInput },
+                        set: {
+                            customRelayInput = $0
+                            syncManager.setRelayUrl($0)
                         }
-                    }
+                    ))
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundColor(.white)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
                 }
 
                 Button(action: {
+                    let relay = syncManager.getRelayUrl()
+                    guard !relay.isEmpty else {
+                        copyMessage = "Silakan isi URL Relay Server terlebih dahulu!"
+                        showingCopyAlert = true
+                        return
+                    }
                     do {
                         let uri = syncManager.isSyncEnabled ? syncManager.getPairingUri() : try syncManager.initializeNewVault()
                         currentPairingUri = uri

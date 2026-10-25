@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/PukiMusic/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
       "tintColor": "FF5E3A",
       "category": "music",
-      "version": "1.0.32",
-      "versionDate": "2026-10-24T16:55:25.920819+00:00",
+      "version": "1.0.33",
+      "versionDate": "2026-10-25T10:32:02.403438+00:00",
       "versionDescription": "\u2022 SideStore Community Source Integration\n\u2022 Dynamic App Versioning\n\u2022 LRC Timing Offset Sync Adjuster Stepper\n\u2022 O(1) Performance Optimization\n\u2022 High-Res Artwork & Offline Cover Caching",
-      "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.32/Puki-Music.ipa",
-      "size": 1648593,
+      "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.33/Puki-Music.ipa",
+      "size": 1651554,
       "screenshotURLs": [],
       "versions": [
+        {
+          "version": "1.0.33",
+          "date": "2026-10-25T10:32:02.403438+00:00",
+          "localizedDescription": "Puki Music iOS v1.0.33 Release Update",
+          "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.33/Puki-Music.ipa",
+          "size": 1651554,
+          "sha256": "44bc613820528182eb1d7078bf8c7bf0fc4f3ae08070004dbda2cb83c44e7753",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "1.0.32",
           "date": "2026-10-24T16:55:25.920819+00:00",

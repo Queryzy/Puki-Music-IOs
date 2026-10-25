@@ -994,6 +994,47 @@ struct LibraryTabView: View {
                                 subtitle: "Ketuk tombol hati di pemutar musik untuk menambahkan lagu favorit."
                             )
                         } else {
+                            // Action Header: Putar Semua & Download Semua Favorit (1:1 Playlist)
+                            HStack(spacing: 12) {
+                                Button(action: {
+                                    if let first = store.favorites.first {
+                                        playerManager.play(track: first, fromQueue: store.favorites)
+                                    }
+                                }) {
+                                    HStack {
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 13, weight: .bold))
+                                        Text("PUTAR SEMUA")
+                                            .font(.system(size: 13, weight: .bold))
+                                    }
+                                    .foregroundColor(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(Color.pukiAmber)
+                                    .cornerRadius(10)
+                                }
+
+                                Button(action: {
+                                    for t in store.favorites {
+                                        downloadService.downloadTrack(track: t)
+                                    }
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                            .font(.system(size: 14))
+                                        Text("DOWNLOAD SEMUA")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(Color.pukiCardElevated)
+                                    .cornerRadius(10)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 6)
+
                             VStack(spacing: 10) {
                                 ForEach(store.favorites) { track in
                                     trackRow(track: track)
@@ -1972,11 +2013,23 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.33 Card
+                        releaseCard(
+                            version: "v1.0.33 (Build 33)",
+                            date: "Oktober 2026",
+                            badge: "TERBARU",
+                            changes: [
+                                "Fix Duplicate Favorites: Pengecekan deduplikasi sinkron di main-thread agar tidak dobel saat multi-event masuk serentak.",
+                                "Auto-Deduplicate Storage: Otomatis membersihkan entri kembar yang sudah tersimpan di memori lokal saat booting.",
+                                "Tombol Download Semua Favorit: Hadir tombol 'DOWNLOAD SEMUA' & 'PUTAR SEMUA' di tab Favorit (1:1 Playlist)."
+                            ]
+                        )
+                        
                         // v1.0.32 Card
                         releaseCard(
                             version: "v1.0.32 (Build 32)",
                             date: "Oktober 2026",
-                            badge: "TERBARU",
+                            badge: "STABIL",
                             changes: [
                                 "Fix 1:1 Full Sync & Outbox Flush: Selaras format payload push/pull relay server Cloudflare Workers.",
                                 "Full State Seeding: Otomatis seed seluruh database lokal (lagu favorit lama, recent searches, playlist) ke relay saat pairing / tombol Sinkronkan ditekan.",

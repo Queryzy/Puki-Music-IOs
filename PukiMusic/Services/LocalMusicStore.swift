@@ -41,7 +41,16 @@ class LocalMusicStore: ObservableObject {
     private func loadData() {
         if let favData = userDefaults.data(forKey: keyFavorites),
            let favs = try? JSONDecoder().decode([Track].self, from: favData) {
-            self.favorites = favs
+            var seen = Set<String>()
+            var uniqueFavs: [Track] = []
+            for f in favs {
+                let norm = Track.normalizeId(f.id)
+                if !seen.contains(norm) {
+                    seen.insert(norm)
+                    uniqueFavs.append(f)
+                }
+            }
+            self.favorites = uniqueFavs
         }
         if let plData = userDefaults.data(forKey: keyPlaylists),
            let pls = try? JSONDecoder().decode([Playlist].self, from: plData) {
@@ -165,18 +174,16 @@ class LocalMusicStore: ObservableObject {
 
     func setFavoriteState(track: Track, isLiked: Bool) {
         let normId = Track.normalizeId(track.id)
-        let idx = favorites.firstIndex(where: { Track.normalizeId($0.id) == normId })
         DispatchQueue.main.async {
+            let exists = self.favorites.contains(where: { Track.normalizeId($0.id) == normId })
             if isLiked {
-                if idx == nil {
+                if !exists {
                     self.favorites.insert(track, at: 0)
                     self.saveFavorites()
                 }
             } else {
-                if let i = idx {
-                    self.favorites.remove(at: i)
-                    self.saveFavorites()
-                }
+                self.favorites.removeAll(where: { Track.normalizeId($0.id) == normId })
+                self.saveFavorites()
             }
         }
     }

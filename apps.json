@@ -16,13 +16,22 @@
       "iconURL": "https://raw.githubusercontent.com/Queryzy/Puki-Music-IOs/main/PukiMusic/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
       "tintColor": "FF5E3A",
       "category": "music",
-      "version": "1.0.35",
-      "versionDate": "2026-10-28T04:00:06.949241+00:00",
+      "version": "1.0.36",
+      "versionDate": "2026-10-28T10:50:05.825590+00:00",
       "versionDescription": "\u2022 SideStore Community Source Integration\n\u2022 Dynamic App Versioning\n\u2022 LRC Timing Offset Sync Adjuster Stepper\n\u2022 O(1) Performance Optimization\n\u2022 High-Res Artwork & Offline Cover Caching",
-      "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.35/Puki-Music.ipa",
-      "size": 1667441,
+      "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.36/Puki-Music.ipa",
+      "size": 1672976,
       "screenshotURLs": [],
       "versions": [
+        {
+          "version": "1.0.36",
+          "date": "2026-10-28T10:50:05.825590+00:00",
+          "localizedDescription": "Puki Music iOS v1.0.36 Release Update",
+          "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.36/Puki-Music.ipa",
+          "size": 1672976,
+          "sha256": "a2c14fe90bee695544018af18bae9981d45c70f19fd6ee7fc833ec3b92d18055",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "1.0.35",
           "date": "2026-10-28T04:00:06.949241+00:00",
@@ -102,15 +111,6 @@
           "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.27/Puki-Music.ipa",
           "size": 1571827,
           "sha256": "90dd39da044946eec86ee3d98c5dc3905f33f8b9f1c4b105f45ff0522ed86b0b",
-          "minOSVersion": "16.0"
-        },
-        {
-          "version": "1.0.26",
-          "date": "2026-10-22T09:02:26.903310+00:00",
-          "localizedDescription": "\u2022 SideStore Community Source Integration\n\u2022 Dynamic App Versioning\n\u2022 LRC Timing Offset Sync Adjuster Stepper\n\u2022 O(1) Performance Optimization\n\u2022 High-Res Artwork & Offline Cover Caching",
-          "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.26/Puki-Music.ipa",
-          "size": 1571205,
-          "sha256": "69ec74147d0d69b82335b384e73d32b85d469cee63b1be2773ef2d6cb6712a30",
           "minOSVersion": "16.0"
         }
       ]

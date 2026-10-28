@@ -47,11 +47,18 @@ final class YouTubeMusicService {
         return json
     }
     
-    /// Cari Album resmi YouTube Music (Filter: params 'EgWKAQIYAWoMEAMQBBAJEA4QChAF')
+    /// Cari Album resmi YouTube Music (Two-tier: Artist Discography First -> Strict Album Search)
     func searchAlbums(query: String, limit: Int = 20) async -> [Album] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return [] }
         
+        // Tier 1: Ambil langsung dari kanal artis resmi jika terdeteksi (100% akurat)
+        let artistAlbums = await fetchAlbumsFromArtistChannel(query: q, limit: limit)
+        if !artistAlbums.isEmpty {
+            return artistAlbums
+        }
+        
+        // Tier 2: Search global dengan filter ketat
         let payload: [String: Any] = [
             "context": createBaseContext(),
             "query": q,
@@ -148,12 +155,12 @@ final class YouTubeMusicService {
                     
                     albums.append(
                         Album(
-                            id: browseId,
-                            title: title,
-                            artist: artistName,
-                            trackCount: 0,
-                            thumbnailUrl: thumbUrl,
-                            url: browseId
+                            id = browseId,
+                            title = title,
+                            artist = artistName,
+                            trackCount = 0,
+                            thumbnailUrl = thumbUrl,
+                            url = browseId
                         )
                     )
                 }
@@ -162,6 +169,130 @@ final class YouTubeMusicService {
         } catch {
             return []
         }
+    }
+    
+    private func fetchAlbumsFromArtistChannel(query: String, limit: Int) async -> [Album] {
+        let payload: [String: Any] = [
+            "context": createBaseContext(),
+            "query": query
+        ]
+        
+        do {
+            let json = try await postInnerTube(endpoint: "search", payload: payload)
+            guard let contentsObj = json["contents"] as? [String: Any],
+                  let tabbed = contentsObj["tabbedSearchResultsRenderer"] as? [String: Any],
+                  let tabs = tabbed["tabs"] as? [[String: Any]],
+                  let firstTab = tabs.first,
+                  let tabRend = firstTab["tabRenderer"] as? [String: Any],
+                  let content = tabRend["content"] as? [String: Any],
+                  let secList = content["sectionListRenderer"] as? [String: Any],
+                  let secContents = secList["contents"] as? [[String: Any]] else {
+                return []
+            }
+            
+            var channelBrowseId = ""
+            var matchedArtistName = ""
+            for sec in secContents {
+                guard let card = sec["musicCardShelfRenderer"] as? [String: Any],
+                      let titleObj = card["title"] as? [String: Any],
+                      let runs = titleObj["runs"] as? [[String: Any]],
+                      let firstRun = runs.first else {
+                    continue
+                }
+                
+                let cardTitle = firstRun["text"] as? String ?? ""
+                let nav = firstRun["navigationEndpoint"] as? [String: Any]
+                let browse = nav?["browseEndpoint"] as? [String: Any]
+                let bid = browse?["browseId"] as? String ?? ""
+                
+                if !bid.isEmpty && (cardTitle.localizedCaseInsensitiveContains(query) || query.localizedCaseInsensitiveContains(cardTitle)) {
+                    channelBrowseId = bid
+                    matchedArtistName = cardTitle
+                    break
+                }
+            }
+            
+            guard !channelBrowseId.isEmpty else { return [] }
+            
+            // Browse Artist Channel
+            let bPayload: [String: Any] = [
+                "context": createBaseContext(),
+                "browseId": channelBrowseId
+            ]
+            
+            let bJson = try await postInnerTube(endpoint: "browse", payload: bPayload)
+            guard let bContents = bJson["contents"] as? [String: Any] else { return [] }
+            
+            var bTabs = (bContents["singleColumnBrowseResultsRenderer"] as? [String: Any])?["tabs"] as? [[String: Any]]
+            if bTabs == nil {
+                bTabs = (bContents["twoColumnBrowseResultsRenderer"] as? [String: Any])?["tabs"] as? [[String: Any]]
+            }
+            guard let firstBTab = bTabs?.first,
+                  let bTabRenderer = firstBTab["tabRenderer"] as? [String: Any],
+                  let bTabContent = bTabRenderer["content"] as? [String: Any],
+                  let bSecList = bTabContent["sectionListRenderer"] as? [String: Any],
+                  let bSections = bSecList["contents"] as? [[String: Any]] else {
+                return []
+            }
+            
+            var albums: [Album] = []
+            for secItem in bSections {
+                guard let shelf = secItem["musicCarouselShelfRenderer"] as? [String: Any],
+                      let header = shelf["header"] as? [String: Any],
+                      let basicHeader = header["musicCarouselShelfBasicHeaderRenderer"] as? [String: Any],
+                      let titleObj = basicHeader["title"] as? [String: Any],
+                      let runs = titleObj["runs"] as? [[String: Any]],
+                      let shelfTitle = runs.first?["text"] as? String else {
+                    continue
+                }
+                
+                if shelfTitle.localizedCaseInsensitiveContains("Album") {
+                    guard let items = shelf["contents"] as? [[String: Any]] else { continue }
+                    for item in items {
+                        if albums.count >= limit { break }
+                        guard let mir = item["musicTwoRowItemRenderer"] as? [String: Any],
+                              let aNav = mir["navigationEndpoint"] as? [String: Any],
+                              let aBrowse = aNav["browseEndpoint"] as? [String: Any],
+                              let aBrowseId = aBrowse["browseId"] as? String,
+                              !aBrowseId.isEmpty else {
+                            continue
+                        }
+                        
+                        let tObj = mir["title"] as? [String: Any]
+                        let tRuns = tObj?["runs"] as? [[String: Any]]
+                        let aTitle = tRuns?.first?["text"] as? String ?? ""
+                        guard !aTitle.isEmpty else { continue }
+                        
+                        let thumbObj = mir["thumbnailRenderer"] as? [String: Any]
+                        let mThumb = thumbObj?["musicThumbnailRenderer"] as? [String: Any]
+                        let thObj = mThumb?["thumbnail"] as? [String: Any]
+                        let thumbs = thObj?["thumbnails"] as? [[String: Any]]
+                        var thumbUrl = thumbs?.last?["url"] as? String ?? ""
+                        if thumbUrl.contains("=w") && thumbUrl.contains("-h") {
+                            if let match = thumbUrl.range(of: "=w\\d+-h\\d+.*", options: .regularExpression) {
+                                thumbUrl.replaceSubrange(match, with: "=w544-h544-l90-rj")
+                            }
+                        }
+                        
+                        albums.append(
+                            Album(
+                                id: aBrowseId,
+                                title: aTitle,
+                                artist: matchedArtistName,
+                                trackCount: 0,
+                                thumbnailUrl: thumbUrl,
+                                url: aBrowseId
+                            )
+                        )
+                    }
+                    break
+                }
+            }
+            return albums
+        } catch {
+            return []
+        }
+    }
     }
     
     /// Ambil daftar lagu album via browseId (MPREb_...)

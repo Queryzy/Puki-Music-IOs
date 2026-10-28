@@ -2031,6 +2031,18 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.36 Card
+                        releaseCard(
+                            version: "v1.0.36 (Build 36)",
+                            date: "28 Oktober 2026",
+                            badge: "ARTIST DISCOGRAPHY MASTER",
+                            changes: [
+                                "Prioritas Kanal Artis Resmi: Kueri pencarian nama musisi/band langsung mengurai shelf 'Album' dari kanal artis terverifikasi, menjamin album studio penuh muncul di urutan pertama.",
+                                "Eliminasi Musisi Luar Berjudul Mirip: Mencegah album musisi luar yang kebetulan memiliki judul sama dengan kueri (seperti Savagelife/Savo Rotchie) membajak hasil band lokal.",
+                                "Akurasi 100%: Menampilkan album studio resmi Last Child (Our Biggest Thing Ever, dll), Noah, Peterpan, Dewa 19 secara presisi."
+                            ]
+                        )
+                        
                         // v1.0.35 Card
                         releaseCard(
                             version: "v1.0.35 (Build 35)",

@@ -155,12 +155,12 @@ final class YouTubeMusicService {
                     
                     albums.append(
                         Album(
-                            id = browseId,
-                            title = title,
-                            artist = artistName,
-                            trackCount = 0,
-                            thumbnailUrl = thumbUrl,
-                            url = browseId
+                            id: browseId,
+                            title: title,
+                            artist: artistName,
+                            trackCount: 0,
+                            thumbnailUrl: thumbUrl,
+                            url: browseId
                         )
                     )
                 }

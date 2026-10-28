@@ -2031,6 +2031,18 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.35 Card
+                        releaseCard(
+                            version: "v1.0.35 (Build 35)",
+                            date: "28 Oktober 2026",
+                            badge: "STUDIO ALBUM ONLY",
+                            changes: [
+                                "Strict Studio Album Filter: Menyaring ketat respon InnerTube agar pencarian album murni menampilkan Album Studio & EP penuh tanpa tercampur single 1 lagu.",
+                                "Master Index YouTube Music WEB_REMIX: Integrasi katalog resmi album musisi Indonesia (NOAH, Peterpan, Last Child, Dewa 19) dan internasional 100% lengkap.",
+                                "Direct Stream Bypass: Membuka album langsung memuat tracklist resmi bawaan dengan videoId valid tanpa overhead pencarian ganda."
+                            ]
+                        )
+                        
                         // v1.0.33 Card
                         releaseCard(
                             version: "v1.0.33 (Build 33)",

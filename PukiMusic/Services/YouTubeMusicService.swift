@@ -104,8 +104,12 @@ final class YouTubeMusicService {
                     let col1Text = col1?["text"] as? [String: Any]
                     let col1Runs = col1Text?["runs"] as? [[String: Any]]
                     
+                    var recordType = ""
                     var artistName = ""
                     if let runs = col1Runs {
+                        if let firstRun = runs.first?["text"] as? String {
+                            recordType = firstRun.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
                         for run in runs {
                             if let runNav = run["navigationEndpoint"] as? [String: Any],
                                let rBrowse = runNav["browseEndpoint"] as? [String: Any],
@@ -122,6 +126,11 @@ final class YouTubeMusicService {
                         }
                     }
                     if artistName.isEmpty { artistName = q }
+                    
+                    // Strict Album Filter: Drop single / buku audio / podcast (only allow Album or EP)
+                    if recordType.contains("single") || recordType.contains("buku audio") || recordType.contains("audiobook") {
+                        continue
+                    }
                     
                     // Thumbnail
                     let thumbObj = flex["thumbnail"] as? [String: Any]

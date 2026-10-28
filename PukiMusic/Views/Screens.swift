@@ -187,7 +187,19 @@ struct HomeDashboardView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(spacing: 14) {
                                 ForEach(dashboardData.topAlbums) { album in
-                                    albumCard(album)
+                                    Button(action: {
+                                        let albObj = Album(
+                                            id: "dz_\(album.id)",
+                                            title: album.title,
+                                            artist: album.artistName,
+                                            trackCount: Int64(album.trackCount),
+                                            thumbnailUrl: album.highResCoverUrl,
+                                            url: "dz_\(album.id)"
+                                        )
+                                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: albObj)
+                                    }) {
+                                        albumCard(album)
+                                    }
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -281,7 +293,7 @@ struct HomeDashboardView: View {
 struct SearchTabView: View {
     @State private var query = ""
     @State private var trackResults: [Track] = []
-    @State private var albumResults: [DeezerAlbum] = []
+    @State private var albumResults: [Album] = []
     @State private var selectedFilter: Int = 0 // 0: Semua, 1: Lagu, 2: Album
     @State private var isSearching = false
     @EnvironmentObject var playerManager: AudioPlayerManager
@@ -424,7 +436,7 @@ struct SearchTabView: View {
                                                 NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
                                             }) {
                                                 VStack(alignment: .leading, spacing: 6) {
-                                                    PukiArtworkImage(urlString: album.highResCoverUrl, size: 130, cornerRadius: 10)
+                                                    PukiArtworkImage(urlString: album.thumbnailUrl, size: 130, cornerRadius: 10)
                                                     
                                                     Text(album.title)
                                                         .font(.system(size: 13, weight: .bold))
@@ -432,7 +444,7 @@ struct SearchTabView: View {
                                                         .lineLimit(1)
                                                         .frame(width: 130, alignment: .leading)
                                                     
-                                                    Text(album.artistName)
+                                                    Text(album.artist)
                                                         .font(.system(size: 11))
                                                         .foregroundColor(.pukiAmber)
                                                         .lineLimit(1)
@@ -542,24 +554,52 @@ struct SearchTabView: View {
         
         isSearching = true
         Task {
-            // Dual Search paralel (1:1 Android): Deezer API + YouTube Direct Search
+            // Dual-Engine Search paralel: YouTube Music Official Albums + Deezer API + YouTube Direct Search
             async let dzReq = DeezerService.shared.searchTracks(query: q)
             async let ytReq = YouTubeStreamResolver.shared.searchYouTubeTracks(query: q)
-            async let albumsReq = DeezerService.shared.searchAlbums(query: q)
+            async let ytmAlbumsReq = YouTubeMusicService.shared.searchAlbums(query: q, limit: 20)
+            async let dzAlbumsReq = DeezerService.shared.searchAlbums(query: q, limit: 15)
             
             let dzTracks = (try? await dzReq) ?? []
             let ytTracks = await ytReq
-            let rawAlbums = (try? await albumsReq) ?? []
+            let ytmAlbums = await ytmAlbumsReq
+            let rawDzAlbums = (try? await dzAlbumsReq) ?? []
             
-            // Filter album cerdas (1:1 Android StreamResolver relevance matching):
-            // Prioritaskan album yang nama artisnya atau judulnya mengandung query pencarian
+            // Dual-Engine Fusion: Prioritaskan album resmi YouTube Music (katalog lengkap Indo & Global),
+            // digabung dan dideduplikasi dengan album studio Deezer
+            var mergedAlbums: [Album] = []
+            var seenTitles: Set<String> = []
+            
+            for ytm in ytmAlbums {
+                let key = "\(ytm.title.lowercased().trimmingCharacters(in: .whitespaces))_\(ytm.artist.lowercased().trimmingCharacters(in: .whitespaces))"
+                if seenTitles.insert(key).inserted {
+                    mergedAlbums.append(ytm)
+                }
+            }
+            
             let qLower = q.lowercased()
-            let filteredAlbums = rawAlbums.filter { alb in
+            let filteredDzAlbums = rawDzAlbums.filter { alb in
                 let aLower = alb.artistName.lowercased()
                 let tLower = alb.title.lowercased()
-                return aLower.contains(qLower) || tLower.contains(qLower) || qLower.contains(aLower)
+                return aLower == qLower || aLower.contains(qLower) || tLower.contains(qLower)
             }
-            let albums = filteredAlbums.isEmpty ? rawAlbums : filteredAlbums
+            
+            for dz in (filteredDzAlbums.isEmpty ? rawDzAlbums : filteredDzAlbums) {
+                let key = "\(dz.title.lowercased().trimmingCharacters(in: .whitespaces))_\(dz.artistName.lowercased().trimmingCharacters(in: .whitespaces))"
+                if seenTitles.insert(key).inserted {
+                    mergedAlbums.append(
+                        Album(
+                            id: "dz_\(dz.id)",
+                            title: dz.title,
+                            artist: dz.artistName,
+                            trackCount: Int64(dz.trackCount),
+                            thumbnailUrl: dz.highResCoverUrl,
+                            url: "dz_\(dz.id)"
+                        )
+                    )
+                }
+            }
+            let albums = mergedAlbums
             
             // Map Deezer ke domain Track
             let mappedDzTracks: [Track] = dzTracks.map { dz in
@@ -609,9 +649,9 @@ struct SearchTabView: View {
 
 // MARK: - Album Detail Modal Sheet
 struct AlbumDetailSheetView: View {
-    let album: DeezerAlbum
+    let album: Album
     var onDismiss: (() -> Void)? = nil
-    @State private var tracks: [DeezerTrack] = []
+    @State private var tracks: [Track] = []
     @State private var isLoading = true
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var playerManager: AudioPlayerManager
@@ -654,7 +694,7 @@ struct AlbumDetailSheetView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         // Album Header Info Card
                         HStack(spacing: 16) {
-                            PukiArtworkImage(urlString: album.highResCoverUrl, size: 84, cornerRadius: 12)
+                            PukiArtworkImage(urlString: album.thumbnailUrl, size: 84, cornerRadius: 12)
                             .shadow(color: Color.pukiGlowMagenta.opacity(0.3), radius: 10, x: 0, y: 4)
                             
                             VStack(alignment: .leading, spacing: 4) {
@@ -663,7 +703,7 @@ struct AlbumDetailSheetView: View {
                                     .foregroundColor(.white)
                                     .lineLimit(2)
                                 
-                                Text(album.artistName)
+                                Text(album.artist)
                                     .font(.system(size: 14))
                                     .foregroundColor(.pukiAmber)
                                 
@@ -678,16 +718,16 @@ struct AlbumDetailSheetView: View {
                         .cornerRadius(14)
                         .padding(.horizontal, 20)
                         
-                        // Action Buttons: Putar Album & Unduh 1 Album (1:1 Android)
+                        // Action Buttons: Putar Semua & Unduh Semua
                         if !tracks.isEmpty {
                             HStack(spacing: 12) {
                                 Button(action: {
                                     playAllAlbumTracks()
                                 }) {
                                     HStack {
-                                        Image(systemName: "shuffle")
+                                        Image(systemName: "play.fill")
                                             .font(.system(size: 13, weight: .bold))
-                                        Text("PUTAR ALBUM")
+                                        Text("PUTAR SEMUA")
                                             .font(.system(size: 11, weight: .bold))
                                     }
                                     .foregroundColor(.black)
@@ -699,16 +739,7 @@ struct AlbumDetailSheetView: View {
                                 
                                 Button(action: {
                                     for t in tracks {
-                                        let tid = "\(t.id)"
-                                        let tr = Track(
-                                            id: tid,
-                                            title: t.title,
-                                            artist: t.artistName,
-                                            durationSeconds: t.durationSeconds,
-                                            thumbnailUrl: album.highResCoverUrl,
-                                            streamUrl: t.previewUrl
-                                        )
-                                        DownloadService.shared.downloadTrack(track: tr)
+                                        DownloadService.shared.downloadTrack(track: t)
                                     }
                                 }) {
                                     HStack {
@@ -757,46 +788,28 @@ struct AlbumDetailSheetView: View {
                                 
                                 ForEach(Array(tracks.enumerated()), id: \.element.id) { index, t in
                                     Button(action: {
-                                        let selectedTrack = Track(
-                                            id: "\(t.id)",
-                                            title: t.title,
-                                            artist: t.artistName,
-                                            durationSeconds: t.durationSeconds,
-                                            thumbnailUrl: t.highResCoverUrl,
-                                            streamUrl: t.previewUrl
-                                        )
-                                        let allTracks = tracks.map { item in
-                                            Track(
-                                                id: "\(item.id)",
-                                                title: item.title,
-                                                artist: item.artistName,
-                                                durationSeconds: item.durationSeconds,
-                                                thumbnailUrl: item.highResCoverUrl,
-                                                streamUrl: item.previewUrl
-                                            )
-                                        }
-                                        playerManager.play(track: selectedTrack, fromQueue: allTracks)
+                                        playerManager.play(track: t, fromQueue: tracks)
                                     }) {
                                         HStack(spacing: 12) {
                                             Text(String(format: "%02d", index + 1))
-                                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                                .font(.system(size: 12, weight: .bold, design: .monospaced))
                                                 .foregroundColor(.pukiTextSecondary)
-                                                .frame(width: 24, alignment: .leading)
+                                                .frame(width: 22, alignment: .leading)
                                             
-                                            VStack(alignment: .leading, spacing: 3) {
+                                            VStack(alignment: .leading, spacing: 2) {
                                                 Text(t.title)
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .white)
+                                                    .font(.system(size: 14, weight: .medium))
+                                                    .foregroundColor(.white)
                                                     .lineLimit(1)
                                                 
-                                                HStack(spacing: 6) {
-                                                    Text(t.artistName)
-                                                        .font(.system(size: 12))
+                                                HStack(spacing: 4) {
+                                                    Text(t.artist)
+                                                        .font(.system(size: 11))
                                                         .foregroundColor(.pukiTextSecondary)
                                                         .lineLimit(1)
                                                     
-                                                    Text("💿 OFFICIAL • HD")
-                                                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                    Text("STUDIO")
+                                                        .font(.system(size: 8, weight: .bold))
                                                         .foregroundColor(.pukiTeal)
                                                         .padding(.horizontal, 4)
                                                         .padding(.vertical, 1)
@@ -811,34 +824,25 @@ struct AlbumDetailSheetView: View {
                                                 .font(.system(size: 12))
                                                 .foregroundColor(.pukiTextSecondary)
                                             
-                                            // Individual Track Download Button (Real Background Download 1:1 Android)
-                                            let tid = "\(t.id)"
+                                            // Individual Track Download Button
                                             DownloadProgressButton(
-                                                trackId: tid,
+                                                trackId: t.id,
                                                 onDownload: {
-                                                    let trackObj = Track(
-                                                        id: tid,
-                                                        title: t.title,
-                                                        artist: t.artistName,
-                                                        durationSeconds: t.durationSeconds,
-                                                        thumbnailUrl: album.highResCoverUrl,
-                                                        streamUrl: t.previewUrl
-                                                    )
-                                                    DownloadService.shared.downloadTrack(track: trackObj)
+                                                    DownloadService.shared.downloadTrack(track: t)
                                                 },
                                                 onDelete: {
-                                                    DownloadService.shared.deleteDownloadedTrack(trackId: tid)
+                                                    DownloadService.shared.deleteDownloadedTrack(trackId: t.id)
                                                 }
                                             )
                                             .padding(.trailing, 4)
                                             
-                                            Image(systemName: playerManager.currentTrack?.id == "\(t.id)" && playerManager.isPlaying ? "waveform" : "play.fill")
-                                                .foregroundColor(playerManager.currentTrack?.id == "\(t.id)" ? .pukiCoral : .pukiTextSecondary)
+                                            Image(systemName: playerManager.currentTrack?.id == t.id && playerManager.isPlaying ? "waveform" : "play.fill")
+                                                .foregroundColor(playerManager.currentTrack?.id == t.id ? .pukiCoral : .pukiTextSecondary)
                                                 .font(.system(size: 12))
                                         }
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 10)
-                                        .background(playerManager.currentTrack?.id == "\(t.id)" ? Color.pukiCardElevated : Color.pukiCard.opacity(0.6))
+                                        .background(playerManager.currentTrack?.id == t.id ? Color.pukiCardElevated : Color.pukiCard.opacity(0.6))
                                         .cornerRadius(10)
                                         .padding(.horizontal, 20)
                                     }
@@ -846,38 +850,52 @@ struct AlbumDetailSheetView: View {
                             }
                         }
                     }
-                    .padding(.bottom, 140) // Memberikan ruang cukup agar lagu paling bawah tidak tertutup mini player
+                    .padding(.bottom, 140)
                 }
             }
         }
         .task {
-            let loaded = await DeezerService.shared.getAlbumTracks(albumId: album.id)
-            await MainActor.run {
-                self.tracks = loaded
-                self.isLoading = false
+            if album.id.hasPrefix("dz_") {
+                let dzIdStr = album.id.replacingOccurrences(of: "dz_", with: "")
+                if let dzId = Int64(dzIdStr) {
+                    let loaded = await DeezerService.shared.getAlbumTracks(albumId: dzId)
+                    let mapped = loaded.map { dz in
+                        Track(
+                            id: "dz_\(dz.id)",
+                            title: dz.title,
+                            artist: dz.artistName,
+                            durationSeconds: dz.durationSeconds,
+                            thumbnailUrl: album.thumbnailUrl,
+                            streamUrl: dz.previewUrl,
+                            viewCount: 0,
+                            likeCount: 0
+                        )
+                    }
+                    await MainActor.run {
+                        self.tracks = mapped
+                        self.isLoading = false
+                    }
+                }
+            } else {
+                // YouTube Music Album (MPREb_...)
+                let loaded = await YouTubeMusicService.shared.getAlbumTracks(browseId: album.id)
+                await MainActor.run {
+                    self.tracks = loaded
+                    self.isLoading = false
+                }
             }
         }
     }
     
     private func playAllAlbumTracks() {
         guard let first = tracks.first else { return }
-        let queue = tracks.map {
-            Track(
-                id: "\($0.id)",
-                title: $0.title,
-                artist: $0.artistName,
-                durationSeconds: $0.durationSeconds,
-                thumbnailUrl: $0.highResCoverUrl,
-                streamUrl: $0.previewUrl
-            )
-        }
-        playerManager.play(track: queue[0], fromQueue: queue)
+        playerManager.play(track: first, fromQueue: tracks)
     }
     
-    private func formatDuration(_ seconds: Int64) -> String {
-        let mins = seconds / 60
-        let secs = seconds % 60
-        return String(format: "%d:%02d", mins, secs)
+    private func formatDuration(_ sec: Int64) -> String {
+        let m = sec / 60
+        let s = sec % 60
+        return String(format: "%d:%02d", m, s)
     }
 }
 

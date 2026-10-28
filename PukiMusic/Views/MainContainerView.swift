@@ -20,7 +20,7 @@ struct MainContainerView: View {
     @State private var showLyricsSheet: Bool = false
     
     // In-line Navigation States (1:1 Android: Tidak menimpa mini player dan bottom menu bar)
-    @State private var inlineActiveAlbum: DeezerAlbum? = nil
+    @State private var inlineActiveAlbum: Album? = nil
     @State private var inlineActivePlaylist: Playlist? = nil
     
     var body: some View {
@@ -91,7 +91,7 @@ struct MainContainerView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenAlbumDetail"))) { notif in
-            if let alb = notif.object as? DeezerAlbum {
+            if let alb = notif.object as? Album {
                 self.inlineActiveAlbum = alb
             }
         }

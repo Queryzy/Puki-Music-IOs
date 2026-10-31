@@ -517,9 +517,19 @@ final class SyncManager: ObservableObject {
                 if let seq = ev["seq"] as? Int, seq > maxSeq {
                     maxSeq = seq
                 }
+                let seq = ev["seq"] as? Int64 ?? 0
+                let relayTime: Int64
+                if let caNum = ev["created_at"] as? NSNumber {
+                    relayTime = caNum.int64Value
+                } else if seq > 0 {
+                    relayTime = seq * 1000
+                } else {
+                    relayTime = Int64(Date().timeIntervalSince1970 * 1000)
+                }
+
                 if let ciphertext = (ev["payload_encrypted"] as? String) ?? (ev["ciphertext"] as? String) {
                     if let plaintext = try? SyncCrypto.decrypt(ciphertextBase64: ciphertext, key: keys.encKey) {
-                        applyDecryptedEvents(plaintext)
+                        applyDecryptedEvents(plaintext, fallbackTimestamp: relayTime)
                     }
                 }
             }
@@ -530,16 +540,27 @@ final class SyncManager: ObservableObject {
         }
     }
 
-    private func applyDecryptedEvents(_ jsonStr: String) {
+    private func applyDecryptedEvents(_ jsonStr: String, fallbackTimestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
         guard let data = jsonStr.data(using: .utf8),
-              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+              var dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             return
         }
 
         let originDevId = dict["device_id"] as? String
         if originDevId != getDeviceId() {
             let action = (dict["action"] as? String) ?? ""
-            let eventData = (dict["data"] as? [String: Any]) ?? [:]
+            var eventData = (dict["data"] as? [String: Any]) ?? [:]
+
+            if eventData["likedAt"] == nil {
+                eventData["likedAt"] = fallbackTimestamp
+            }
+            if var trackDict = eventData["track"] as? [String: Any] {
+                if trackDict["likedAt"] == nil {
+                    trackDict["likedAt"] = fallbackTimestamp
+                    eventData["track"] = trackDict
+                }
+            }
+
             LocalMusicStore.shared.applyRemoteSyncEvent(action: action, data: eventData)
         }
     }

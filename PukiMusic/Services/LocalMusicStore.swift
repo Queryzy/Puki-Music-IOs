@@ -149,41 +149,66 @@ class LocalMusicStore: ObservableObject {
     
     func toggleFavorite(track: Track, fromSync: Bool = false) {
         var isNowFav = false
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        var updatedTrack = track
+        updatedTrack.likedAt = now
+
         if let idx = favorites.firstIndex(where: { $0.id == track.id }) {
             favorites.remove(at: idx)
             isNowFav = false
         } else {
-            favorites.insert(track, at: 0)
+            favorites.insert(updatedTrack, at: 0)
             isNowFav = true
+        }
+        favorites.sort {
+            if $0.likedAt != $1.likedAt {
+                return $0.likedAt > $1.likedAt
+            }
+            return $0.title.lowercased() < $1.title.lowercased()
         }
         saveFavorites()
 
         if !fromSync {
             SyncManager.shared.queueEvent(action: "TOGGLE_FAVORITE", data: [
                 "isLiked": isNowFav,
+                "likedAt": now,
                 "track": [
                     "id": track.id,
                     "title": track.title,
                     "artist": track.artist,
                     "duration": track.durationSeconds,
-                    "thumbnailUrl": track.thumbnailUrl
+                    "thumbnailUrl": track.thumbnailUrl,
+                    "likedAt": now
                 ]
             ])
         }
     }
 
-    func setFavoriteState(track: Track, isLiked: Bool) {
+    func setFavoriteState(track: Track, isLiked: Bool, timestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
         let normId = Track.normalizeId(track.id)
+        var effectiveTrack = track
+        effectiveTrack.likedAt = track.likedAt > 0 ? track.likedAt : timestamp
+
         DispatchQueue.main.async {
-            let exists = self.favorites.contains(where: { Track.normalizeId($0.id) == normId })
+            let existingIdx = self.favorites.firstIndex(where: { Track.normalizeId($0.id) == normId })
             if isLiked {
-                if !exists {
-                    self.favorites.insert(track, at: 0)
+                if let idx = existingIdx {
+                    self.favorites[idx] = effectiveTrack
+                } else {
+                    self.favorites.insert(effectiveTrack, at: 0)
+                }
+                self.favorites.sort {
+                    if $0.likedAt != $1.likedAt {
+                        return $0.likedAt > $1.likedAt
+                    }
+                    return $0.title.lowercased() < $1.title.lowercased()
+                }
+                self.saveFavorites()
+            } else {
+                if let idx = existingIdx {
+                    self.favorites.remove(at: idx)
                     self.saveFavorites()
                 }
-            } else {
-                self.favorites.removeAll(where: { Track.normalizeId($0.id) == normId })
-                self.saveFavorites()
             }
         }
     }
@@ -381,14 +406,16 @@ class LocalMusicStore: ObservableObject {
             }
         case "TOGGLE_FAVORITE":
             let isLiked = (data["isLiked"] as? Bool) ?? true
+            let likedAt = (data["likedAt"] as? NSNumber)?.int64Value ?? ((data["likedAt"] as? Int64) ?? 0)
             if let trackDict = data["track"] as? [String: Any],
                let id = trackDict["id"] as? String,
                let title = trackDict["title"] as? String,
                let artist = trackDict["artist"] as? String {
                 let duration = (trackDict["duration"] as? NSNumber)?.int64Value ?? ((trackDict["duration"] as? Int64) ?? 0)
                 let thumb = (trackDict["thumbnailUrl"] as? String) ?? ""
-                let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb)
-                setFavoriteState(track: track, isLiked: isLiked)
+                let trackLikedAt = (trackDict["likedAt"] as? NSNumber)?.int64Value ?? ((trackDict["likedAt"] as? Int64) ?? likedAt)
+                let track = Track(id: id, title: title, artist: artist, durationSeconds: duration, thumbnailUrl: thumb, likedAt: trackLikedAt)
+                setFavoriteState(track: track, isLiked: isLiked, timestamp: trackLikedAt > 0 ? trackLikedAt : Int64(Date().timeIntervalSince1970 * 1000))
             }
         case "ADD_SEARCH":
             if let query = data["query"] as? String, !query.isEmpty {

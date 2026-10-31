@@ -9,6 +9,7 @@ struct Track: Identifiable, Codable, Equatable {
     var streamUrl: String? = nil
     var viewCount: Int64 = 0
     var likeCount: Int64 = 0
+    var likedAt: Int64 = 0
     
     /// Normalisasi Track ID (1:1 Android LocalMusicStore.normalizeId)
     static func normalizeId(_ rawId: String) -> String {

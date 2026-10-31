@@ -2031,6 +2031,18 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.37 Card
+                        releaseCard(
+                            version: "v1.0.37 (Build 37)",
+                            date: "31 Oktober 2026",
+                            badge: "DETERMINISTIC LIKED PARITY",
+                            changes: [
+                                "Deterministic Liked Ordering: Urutan lagu favorit selalu tersusun rapi dari yang terbaru ke terlama (DESC) identik di Android, iOS, dan Windows.",
+                                "Timestamp Outbox Sync: Setiap event suka membawa epoch timestamp akurat ke server relay.",
+                                "Relay Sequence Fallback: Menstempel riwayat lagu lama dengan waktu server relay secara presisi."
+                            ]
+                        )
+
                         // v1.0.36 Card
                         releaseCard(
                             version: "v1.0.36 (Build 36)",

@@ -476,7 +476,7 @@ struct SearchTabView: View {
                                                             Task {
                                                                 if let tracks = await YouTubeMusicService.shared.getAlbumTracks(browseId: albumId), !tracks.isEmpty {
                                                                     await MainActor.run {
-                                                                        playerManager.play(track: tracks[0], playlist: tracks)
+                                                                        playerManager.play(track: tracks[0], fromQueue: tracks)
                                                                     }
                                                                 }
                                                             }

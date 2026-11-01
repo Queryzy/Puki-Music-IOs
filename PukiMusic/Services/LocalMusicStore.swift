@@ -238,6 +238,15 @@ class LocalMusicStore: ObservableObject {
         }
         return newPl
     }
+
+    @discardableResult
+    func saveAlbumAsPlaylist(title: String, tracks: [Track]) -> Playlist? {
+        guard let pl = createPlaylist(name: title.isEmpty ? "Album Playlist" : title) else { return nil }
+        for t in tracks {
+            addTrackToPlaylist(playlistId: pl.id, track: t)
+        }
+        return pl
+    }
     
     func deletePlaylist(id: String) {
         playlists.removeAll(where: { $0.id == id })

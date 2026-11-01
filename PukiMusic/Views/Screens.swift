@@ -49,6 +49,38 @@ struct HomeDashboardView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
+
+                // Banner Home Kembar (Android & Windows Parity)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("✨ SPESIAL UNTUK KAMU")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.pukiAmber)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.pukiAmber.opacity(0.15))
+                        .cornerRadius(6)
+                    
+                    Text("Musik Favoritmu")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.top, 2)
+                    
+                    Text("Kumpulan lagu dan musisi pilihan yang sering kamu dengar.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.pukiTextSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(
+                    LinearGradient(
+                        colors: [Color.pukiCoral.opacity(0.15), Color.pukiCard],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(14)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.pukiCoral.opacity(0.2), lineWidth: 1))
+                .padding(.horizontal, 20)
                 
                 // Behavior Top Artists Bar (1:1 Android Parity)
                 let topArtists = store.getUserTopArtists(limit: 6)
@@ -436,7 +468,28 @@ struct SearchTabView: View {
                                                 NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
                                             }) {
                                                 VStack(alignment: .leading, spacing: 6) {
-                                                    PukiArtworkImage(urlString: album.thumbnailUrl, size: 130, cornerRadius: 10)
+                                                    ZStack(alignment: .bottomTrailing) {
+                                                        PukiArtworkImage(urlString: album.thumbnailUrl, size: 130, cornerRadius: 10)
+                                                        
+                                                        Button(action: {
+                                                            Task {
+                                                                if let tracks = await YouTubeMusicService.shared.getAlbumTracks(browseId: album.id), !tracks.isEmpty {
+                                                                    await MainActor.run {
+                                                                        playerManager.play(track: tracks[0], playlist: tracks)
+                                                                    }
+                                                                }
+                                                            }
+                                                        }) {
+                                                            Image(systemName: "play.fill")
+                                                                .font(.system(size: 13, weight: .bold))
+                                                                .foregroundColor(.black)
+                                                                .frame(width: 32, height: 32)
+                                                                .background(Color.pukiCoral)
+                                                                .clipShape(Circle())
+                                                                .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 2)
+                                                        }
+                                                        .padding(6)
+                                                    }
                                                     
                                                     Text(album.title)
                                                         .font(.system(size: 13, weight: .bold))
@@ -718,16 +771,16 @@ struct AlbumDetailSheetView: View {
                         .cornerRadius(14)
                         .padding(.horizontal, 20)
                         
-                        // Action Buttons: Putar Semua & Unduh Semua
+                        // Action Buttons: Putar, Simpan ke Playlist & Unduh
                         if !tracks.isEmpty {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 8) {
                                 Button(action: {
                                     playAllAlbumTracks()
                                 }) {
-                                    HStack {
+                                    HStack(spacing: 4) {
                                         Image(systemName: "play.fill")
-                                            .font(.system(size: 13, weight: .bold))
-                                        Text("PUTAR SEMUA")
+                                            .font(.system(size: 11, weight: .bold))
+                                        Text("PUTAR")
                                             .font(.system(size: 11, weight: .bold))
                                     }
                                     .foregroundColor(.black)
@@ -738,14 +791,32 @@ struct AlbumDetailSheetView: View {
                                 }
                                 
                                 Button(action: {
+                                    store.saveAlbumAsPlaylist(title: album.title, tracks: tracks)
+                                    NotificationCenter.default.post(name: NSNotification.Name("ShowPukiToast"), object: "Album disimpan ke Playlist!")
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "text.badge.plus")
+                                            .font(.system(size: 11, weight: .bold))
+                                        Text("PLAYLIST")
+                                            .font(.system(size: 11, weight: .bold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(Color.pukiCardElevated)
+                                    .cornerRadius(8)
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.pukiCoral.opacity(0.4), lineWidth: 1))
+                                }
+
+                                Button(action: {
                                     for t in tracks {
                                         DownloadService.shared.downloadTrack(track: t)
                                     }
                                 }) {
-                                    HStack {
+                                    HStack(spacing: 4) {
                                         Image(systemName: "arrow.down.circle.fill")
-                                            .font(.system(size: 13, weight: .bold))
-                                        Text("UNDUH 1 ALBUM")
+                                            .font(.system(size: 11, weight: .bold))
+                                        Text("UNDUH")
                                             .font(.system(size: 11, weight: .bold))
                                     }
                                     .foregroundColor(.black)
@@ -1627,7 +1698,7 @@ struct SettingsTabView: View {
                         syncManager.triggerSyncNow(forceSeed: true)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                             isManualSyncing = false
-                            copyMessage = "Sinkronisasi telemetri berhasil dikirim!"
+                            copyMessage = "Lagu dan playlist berhasil disinkronkan!"
                             showingCopyAlert = true
                         }
                     }) {
@@ -1814,7 +1885,7 @@ struct SettingsTabView: View {
                         showingScannerModal = false
                         let success = syncManager.parseAndApplyPairingUri(scannedText)
                         if success {
-                            copyMessage = "Berhasil menghubungkan perangkat! Sinkronisasi telemetri aktif."
+                            copyMessage = "Berhasil menghubungkan perangkat! Musikmu kini otomatis sinkron."
                         } else {
                             copyMessage = "Format QR Code tidak dikenali sebagai Puki Music Sync."
                         }
@@ -2031,6 +2102,19 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.39 Card
+                        releaseCard(
+                            version: "v1.0.39 (Build 39)",
+                            date: "1 November 2026",
+                            badge: "QUICK PLAY & ALBUM PLAYLIST",
+                            changes: [
+                                "Putar Cepat Album: Tombol Play instan pada cover card album pencarian untuk memutar seluruh album secara langsung.",
+                                "Simpan Album ke Playlist: Tombol Playlist di detail album untuk menyimpan seluruh tracklist menjadi playlist pribadi dengan sinkronisasi E2EE otomatis.",
+                                "Banner Home Elegan: Kartu sambutan ramah 'Musik Favoritmu' di Home Screen yang senada dengan Android dan Windows.",
+                                "Pembersihan Copywriting & GUI: Penghapusan istilah teknis robotik pada notifikasi sinkronisasi."
+                            ]
+                        )
+
                         // v1.0.38 Card
                         releaseCard(
                             version: "v1.0.38 (Build 38)",

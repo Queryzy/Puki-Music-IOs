@@ -2031,6 +2031,18 @@ struct ChangelogSheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // v1.0.38 Card
+                        releaseCard(
+                            version: "v1.0.38 (Build 38)",
+                            date: "1 November 2026",
+                            badge: "ROMAJI CJK & PARITY",
+                            changes: [
+                                "CJK Romaji Lyrics Engine: Dukungan tombol alih aksara Romaji (Jepang Kanji/Kana, Korea Hangul, dan Mandarin Pinyin) 1:1 identik dengan Android & Windows.",
+                                "Multi-Tier LRCLIB Query: Penambahan pencarian kueri Romaji otomatis pada database LRCLIB jika judul lagu terdeteksi karakter CJK.",
+                                "CI/CD Auto Author Fix: Standarisasi identitas commit otomatis rilis SideStore apps.json ke Nands (Queryzy)."
+                            ]
+                        )
+
                         // v1.0.37 Card
                         releaseCard(
                             version: "v1.0.37 (Build 37)",
@@ -2881,6 +2893,7 @@ struct InlineLyricsPlayerView: View {
     @State private var currentLineId: Int64? = nil
     @State private var lyricOffset: Double = 0.0
     @State private var showSyncControls: Bool = false
+    @State private var useRomaji: Bool = false
     
     var body: some View {
         VStack(spacing: 4) {
@@ -2894,13 +2907,29 @@ struct InlineLyricsPlayerView: View {
                 Spacer()
             } else if let lrc = lyrics {
                 if lrc.isSynced && !lrc.lines.isEmpty {
-                    // Quick bar header untuk tombol Sync Lirik
+                    // Quick bar header untuk tombol Sync Lirik & Romaji
                     HStack {
                         Text("\(lrc.lines.count) Baris Lirik")
                             .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundColor(.pukiTextSecondary.opacity(0.6))
                         
                         Spacer()
+
+                        Button(action: {
+                            useRomaji.toggle()
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "character.book.closed")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text(useRomaji ? "ROMAJI: ON" : "ROMAJI: OFF")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(useRomaji ? Color.pukiAmber.opacity(0.3) : Color.white.opacity(0.08))
+                            .foregroundColor(useRomaji ? .pukiAmber : .pukiTextSecondary)
+                            .cornerRadius(8)
+                        }
                         
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
@@ -2942,12 +2971,13 @@ struct InlineLyricsPlayerView: View {
                             VStack(spacing: 20) {
                                 ForEach(lrc.lines) { line in
                                     let isCurrent = (line.id == currentLineId)
+                                    let displayText = useRomaji ? RomajiHelper.shared.toRomaji(line.text) : line.text
                                     Button(action: {
                                         // Tap pada baris lirik untuk seek ke detik lagu presisi offset (1:1 Android)
                                         let targetSec = (Double(line.timeMs) / 1000.0) + lyricOffset
                                         playerManager.seek(to: max(0, targetSec))
                                     }) {
-                                        Text(line.text)
+                                        Text(displayText)
                                             .font(.system(size: isCurrent ? 23 : 16, weight: isCurrent ? .bold : .medium))
                                             .foregroundColor(isCurrent ? .pukiAmber : .white.opacity(0.35))
                                             .multilineTextAlignment(.center)
@@ -2966,8 +2996,9 @@ struct InlineLyricsPlayerView: View {
                         }
                     }
                 } else if let plain = lrc.plainLyrics {
+                    let displayPlain = useRomaji ? RomajiHelper.shared.toRomaji(plain) : plain
                     ScrollView {
-                        Text(plain)
+                        Text(displayPlain)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
                             .lineSpacing(8)
@@ -3067,6 +3098,7 @@ struct LyricsSheetView: View {
     @State private var currentLineId: Int64? = nil
     @State private var lyricOffset: Double = 0.0
     @State private var showSyncControls: Bool = false
+    @State private var useRomaji: Bool = false
     
     var body: some View {
         ZStack {

@@ -44,6 +44,17 @@ class LyricsService {
         searchQueries.append(cleanTitle)
         searchQueries.append("\(track.artist) \(track.title)")
         searchQueries.append(track.title)
+
+        // CJK Romaji query support matching Android & Windows
+        if RomajiHelper.shared.containsCJK(cleanTitle) {
+            let romajiTitle = RomajiHelper.shared.toRomaji(cleanTitle)
+            if !romajiTitle.isEmpty && romajiTitle != cleanTitle {
+                if !cleanArtist.isEmpty {
+                    searchQueries.append("\(cleanArtist) \(romajiTitle)")
+                }
+                searchQueries.append(romajiTitle)
+            }
+        }
         
         // Buat distinct
         var seen = Set<String>()

@@ -706,6 +706,7 @@ struct AlbumDetailSheetView: View {
     var onDismiss: (() -> Void)? = nil
     @State private var tracks: [Track] = []
     @State private var isLoading = true
+    @State private var toastMessage: String? = nil
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var playerManager: AudioPlayerManager
     @ObservedObject var store = LocalMusicStore.shared
@@ -792,7 +793,12 @@ struct AlbumDetailSheetView: View {
                                 
                                 Button(action: {
                                     store.saveAlbumAsPlaylist(title: album.title, tracks: tracks)
-                                    NotificationCenter.default.post(name: NSNotification.Name("ShowPukiToast"), object: "Album disimpan ke Playlist!")
+                                    withAnimation {
+                                        toastMessage = "Album berhasil disimpan ke Playlist!"
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        withAnimation { toastMessage = nil }
+                                    }
                                 }) {
                                     HStack(spacing: 4) {
                                         Image(systemName: "text.badge.plus")
@@ -954,6 +960,26 @@ struct AlbumDetailSheetView: View {
                     self.tracks = loaded
                     self.isLoading = false
                 }
+            }
+            if let toast = toastMessage {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.pukiSuccess)
+                        Text(toast)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.pukiCardElevated)
+                    .cornerRadius(20)
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.pukiSuccess.opacity(0.4), lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.5), radius: 8, x: 0, y: 4)
+                    .padding(.bottom, 24)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }

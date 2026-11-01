@@ -70,10 +70,9 @@ jobs:
           name: "Puki Music iOS ${{ steps.get_version.outputs.tag }}"
           body: |
             ## Puki Music iOS Native (SwiftUI) ${{ steps.get_version.outputs.tag }}
-            - **SideStore Auto-Update Repository**: Added community source format `apps.json` for 1-click updates in SideStore.
-            - **Dynamic App Versioning**: Displaying real marketing version and build number in Settings.
-            - **LRC Timing Offset Adjuster**: Interactive real-time lyric sync stepper bar `[-0.5s] [-0.1s] [0.0s] [+0.1s] [+0.5s]`.
-            - **O(1) Lyric Active Match & 1Hz Remote Throttling**: Peak performance with zero UI stutter.
+            - **CJK Romaji Lyrics Engine**: Tombol toggle `ROMAJI: ON/OFF` untuk transliterasi lirik Jepang Kanji/Kana, Korea Hangul, dan Mandarin Pinyin secara live.
+            - **Multi-Tier LRCLIB Query Fallback**: Pencarian lirik otomatis menyertakan kueri Romaji untuk lagu-lagu non-Latin.
+            - **Author Standardisation**: Identitas author dan commit otomatis diseragamkan ke Nands (Queryzy).
           files: build/Puki-Music.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -125,6 +124,7 @@ jobs:
               app['version'] = ver
               app['versionDate'] = now_iso
               app['downloadURL'] = ipa_url
+              app['versionDescription'] = f'• CJK Romaji Lyrics Engine 1:1 Parity\n• Multi-Tier LRCLIB Query Fallback\n• Author standardisation'
               
               with open('apps.json', 'w') as f:
                   json.dump(data, f, indent=2)
@@ -133,8 +133,8 @@ jobs:
               print(f'Failed to update apps.json: {e}')
           "
           
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "Nands"
+          git config --global user.email "108982344+Queryzy@users.noreply.github.com"
           git add apps.json
           git commit -m "chore(repo): update apps.json to ${{ steps.get_version.outputs.tag }} [skip ci]" || echo "No changes to commit"
           git push origin main || echo "Push skipped or not needed"

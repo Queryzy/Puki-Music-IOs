@@ -17,7 +17,7 @@
       "tintColor": "FF5E3A",
       "category": "music",
       "version": "1.0.37",
-      "versionDate": "2026-10-31T17:44:55.672554+00:00",
+      "versionDate": "2026-11-01T04:38:26.793431+00:00",
       "versionDescription": "\u2022 Deterministic Liked Ordering & Cross-Platform Parity\n\u2022 Timestamp Outbox Sync (likedAt)\n\u2022 Relay Sequence Timestamp Fallback",
       "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.37/Puki-Music.ipa",
       "size": 1677470,
@@ -25,11 +25,11 @@
       "versions": [
         {
           "version": "1.0.37",
-          "date": "2026-10-31T17:44:55.672554+00:00",
+          "date": "2026-11-01T04:38:26.793431+00:00",
           "localizedDescription": "Puki Music iOS v1.0.37 Release Update",
           "downloadURL": "https://github.com/Queryzy/Puki-Music-IOs/releases/download/v1.0.37/Puki-Music.ipa",
           "size": 1677470,
-          "sha256": "75808e3f329899d749c717e16787a3e8af57b4739c0737b638bfc5f6be710314",
+          "sha256": "9ca3b0e81a6d435c6977504e8af8b56f091f731ec8eb27ef1d3babaddd6bfc76",
           "minOSVersion": "16.0"
         },
         {

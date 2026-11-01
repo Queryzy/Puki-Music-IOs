@@ -11,6 +11,7 @@ extension Color {
     static let pukiGlowSunset = Color(hex: "FCA766")
     static let pukiGlowMagenta = Color(hex: "E8537D")
     static let pukiTeal = Color(hex: "2DD4BF")
+    static let pukiSuccess = Color(hex: "2DD4BF")
     static let pukiTextPrimary = Color.white
     static let pukiTextSecondary = Color(hex: "9E9EB2")
     

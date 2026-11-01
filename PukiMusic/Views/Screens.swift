@@ -463,7 +463,7 @@ struct SearchTabView: View {
                                 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     LazyHStack(spacing: 12) {
-                                        ForEach(albumResults) { album in
+                                        ForEach(albumResults, id: \.id) { (album: Album) in
                                             Button(action: {
                                                 NotificationCenter.default.post(name: NSNotification.Name("OpenAlbumDetail"), object: album)
                                             }) {
@@ -472,8 +472,9 @@ struct SearchTabView: View {
                                                         PukiArtworkImage(urlString: album.thumbnailUrl, size: 130, cornerRadius: 10)
                                                         
                                                         Button(action: {
+                                                            let albumId = album.id
                                                             Task {
-                                                                if let tracks = await YouTubeMusicService.shared.getAlbumTracks(browseId: album.id), !tracks.isEmpty {
+                                                                if let tracks = await YouTubeMusicService.shared.getAlbumTracks(browseId: albumId), !tracks.isEmpty {
                                                                     await MainActor.run {
                                                                         playerManager.play(track: tracks[0], playlist: tracks)
                                                                     }
@@ -484,11 +485,11 @@ struct SearchTabView: View {
                                                                 .font(.system(size: 13, weight: .bold))
                                                                 .foregroundColor(.black)
                                                                 .frame(width: 32, height: 32)
-                                                                .background(Color.pukiCoral)
+                                                                .background(Color.pukiAmber)
                                                                 .clipShape(Circle())
                                                                 .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 2)
                                                         }
-                                                        .padding(6)
+                                                        .padding(8)
                                                     }
                                                     
                                                     Text(album.title)
@@ -966,7 +967,7 @@ struct AlbumDetailSheetView: View {
                     Spacer()
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.pukiSuccess)
+                            .foregroundColor(.pukiTeal)
                         Text(toast)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
@@ -975,7 +976,7 @@ struct AlbumDetailSheetView: View {
                     .padding(.vertical, 10)
                     .background(Color.pukiCardElevated)
                     .cornerRadius(20)
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.pukiSuccess.opacity(0.4), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.pukiTeal.opacity(0.4), lineWidth: 1))
                     .shadow(color: Color.black.opacity(0.5), radius: 8, x: 0, y: 4)
                     .padding(.bottom, 24)
                 }
